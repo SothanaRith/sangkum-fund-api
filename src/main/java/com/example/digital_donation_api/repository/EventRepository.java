@@ -1,0 +1,43 @@
+package com.example.digital_donation_api.repository;
+
+import com.example.digital_donation_api.entity.Event;
+import com.example.digital_donation_api.entity.EventStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface EventRepository extends JpaRepository<Event, Long> {
+
+    List<Event> findByStatus(EventStatus status);
+
+    List<Event> findByOwnerId(Long ownerId);
+
+    List<Event> findByCharityId(Long charityId);
+
+    Optional<Event> findByJoinCode(String joinCode);
+
+    @Query("""
+        SELECT e FROM Event e
+        WHERE e.visibility = 'PUBLIC'
+          AND e.status = 'ACTIVE'
+    """)
+    List<Event> findPublicActiveEvents();
+
+    @Query(value = """
+        SELECT e.title, 
+               e.goal_amount, 
+               COALESCE(SUM(CASE WHEN d.status = 'SUCCESS' THEN d.amount ELSE 0 END), 0) as raised,
+               COUNT(d.id) as donations_count
+        FROM events e
+        LEFT JOIN donations d ON e.id = d.event_id
+        WHERE e.owner_id = :userId
+        GROUP BY e.id, e.title, e.goal_amount
+        ORDER BY raised DESC
+    """, nativeQuery = true)
+    List<Object[]> findEventsPerformanceByUser(@Param("userId") Long userId);
+}
