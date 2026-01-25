@@ -24,4 +24,6 @@ public class CharityCreateRequest {
     private String contactPhone;
     
     private String website;
+    
+    private String category;
 }

@@ -15,6 +15,7 @@ public class CharityMapper {
                 charity.getContactEmail(),
                 charity.getContactPhone(),
                 charity.getWebsite(),
+                charity.getCategory(),
                 charity.getStatus().name(),
                 charity.getVerifiedAt()
         );

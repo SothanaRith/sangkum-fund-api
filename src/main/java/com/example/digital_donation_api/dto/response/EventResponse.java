@@ -5,6 +5,7 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @AllArgsConstructor
 @Getter
@@ -28,4 +29,9 @@ public class EventResponse {
     private Integer donationCount;
     private Integer participantCount;
     private Double progressPercentage;
+    private List<EventImageResponse> images;
+    private String location;
+    private Double latitude;
+    private Double longitude;
+    private String category;
 }

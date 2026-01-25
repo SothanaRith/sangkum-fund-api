@@ -1,11 +1,13 @@
 package com.example.digital_donation_api.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -35,7 +37,29 @@ public class User implements UserDetails {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "account_locked")
+    private Boolean accountLocked = false;
+
+    @Column(name = "lock_time")
+    private LocalDateTime lockTime;
+    
+    @Column(name = "is_blocked")
+    private Boolean isBlocked = false;
+    
+    @Column(name = "block_reason")
+    private String blockReason;
+    
+    @Column(name = "blocked_at")
+    private LocalDateTime blockedAt;
+    
+    @Column(name = "blocked_by")
+    private Long blockedBy;
+
     @OneToMany(mappedBy = "owner")
+    @JsonIgnore
     private List<Event> ownedEvents = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER)
@@ -60,6 +84,19 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
+        // Check if account is locked
+        if (accountLocked != null && accountLocked) {
+            // If lock time is set, check if lock period has expired (e.g., 30 minutes)
+            if (lockTime != null) {
+                LocalDateTime unlockTime = lockTime.plusMinutes(30);
+                if (LocalDateTime.now().isAfter(unlockTime)) {
+                    // Lock period expired, account should be unlocked
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
         return true;
     }
 

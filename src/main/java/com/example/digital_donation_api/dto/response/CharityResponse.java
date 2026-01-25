@@ -17,6 +17,7 @@ public class CharityResponse {
     private String contactEmail;
     private String contactPhone;
     private String website;
+    private String category;
     private String status;
     private LocalDateTime verifiedAt;
 }

@@ -3,6 +3,7 @@ package com.example.digital_donation_api.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -37,6 +38,12 @@ public class Charity {
     private String contactPhone;
     
     private String website;
+    
+    private String category;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     @Enumerated(EnumType.STRING)
     private CharityStatus status = CharityStatus.PENDING;

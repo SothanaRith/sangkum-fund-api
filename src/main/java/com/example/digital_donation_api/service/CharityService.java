@@ -1,6 +1,8 @@
 package com.example.digital_donation_api.service;
 
 import com.example.digital_donation_api.entity.Charity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -8,9 +10,11 @@ public interface CharityService {
 
     Charity create(Charity charity, Long userId);
     
-    List<Charity> getAll();
+    Charity update(Long charityId, Charity charityData, Long userId);
     
-    List<Charity> getVerified();
+    Page<Charity> getAll(Pageable pageable);
+    
+    Page<Charity> getVerified(Pageable pageable);
     
     Charity getById(Long id);
 

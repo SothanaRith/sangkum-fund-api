@@ -2,6 +2,8 @@ package com.example.digital_donation_api.repository;
 
 import com.example.digital_donation_api.entity.Event;
 import com.example.digital_donation_api.entity.EventStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +17,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     List<Event> findByStatus(EventStatus status);
 
-    List<Event> findByOwnerId(Long ownerId);
+    Page<Event> findByOwnerId(Long ownerId, Pageable pageable);
 
     List<Event> findByCharityId(Long charityId);
 
@@ -24,9 +26,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("""
         SELECT e FROM Event e
         WHERE e.visibility = 'PUBLIC'
-          AND e.status = 'ACTIVE'
+          AND e.status IN ('ACTIVE', 'APPROVED')
+          AND e.status != 'BLOCKED'
     """)
-    List<Event> findPublicActiveEvents();
+    Page<Event> findPublicActiveEvents(Pageable pageable);
 
     @Query(value = """
         SELECT e.title, 

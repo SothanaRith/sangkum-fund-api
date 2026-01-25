@@ -1,6 +1,8 @@
 package com.example.digital_donation_api.repository;
 
 import com.example.digital_donation_api.entity.Donation;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +16,9 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
 
     List<Donation> findByEventId(Long eventId);
 
-    List<Donation> findByUserId(Long userId);
+    List<Donation> findTop5ByEventIdOrderByCreatedAtDesc(Long eventId);
+
+    Page<Donation> findByUserId(Long userId, Pageable pageable);
 
     @Query("""
         SELECT COALESCE(SUM(d.amount), 0)
@@ -54,14 +58,14 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
     List<Object[]> countByStatusAndUserId(@Param("userId") Long userId);
 
     @Query("""
-        SELECT e.title, SUM(d.amount), COUNT(d)
-        FROM Donation d
-        JOIN d.event e
-        WHERE d.user.id = :userId AND d.status = 'SUCCESS'
-        GROUP BY e.id, e.title
-        ORDER BY SUM(d.amount) DESC
+      SELECT e.title, SUM(d.amount), COUNT(d)
+      FROM Donation d
+      JOIN d.event e
+      WHERE d.user.id = :userId AND d.status = 'SUCCESS'
+      GROUP BY e.id, e.title
+      ORDER BY SUM(d.amount) DESC
     """)
-    List<Object[]> findTopEventsByUser(@Param("userId") Long userId, @Param("limit") int limit);
+    List<Object[]> findTopEventsByUser(@Param("userId") Long userId);
 
     @Query(value = """
         SELECT DATE(d.created_at) as date, 
@@ -74,4 +78,22 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
         ORDER BY date ASC
     """, nativeQuery = true)
     List<Object[]> findDonationTrends(@Param("userId") Long userId, @Param("days") int days);
+
+    @Query("""
+        SELECT COALESCE(SUM(d.amount), 0)
+        FROM Donation d
+        WHERE d.event.id = :eventId
+          AND d.user.id = :userId
+          AND d.status = 'SUCCESS'
+    """)
+    BigDecimal sumSuccessfulDonationsByEventAndUser(@Param("eventId") Long eventId, @Param("userId") Long userId);
+
+    @Query("""
+        SELECT COUNT(d)
+        FROM Donation d
+        WHERE d.event.id = :eventId
+          AND d.user.id = :userId
+          AND d.status = 'SUCCESS'
+    """)
+    Long countSuccessfulDonationsByEventAndUser(@Param("eventId") Long eventId, @Param("userId") Long userId);
 }

@@ -6,6 +6,8 @@ import com.example.digital_donation_api.exception.ResourceNotFoundException;
 import com.example.digital_donation_api.repository.*;
 import com.example.digital_donation_api.service.DonationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,8 +71,8 @@ public class DonationServiceImpl implements DonationService {
     }
     
     @Override
-    public List<Donation> getMyDonations(Long userId) {
-        return donationRepository.findByUserId(userId);
+    public Page<Donation> getMyDonations(Long userId, Pageable pageable) {
+        return donationRepository.findByUserId(userId, pageable);
     }
     
     private String processPayment(PaymentMethod method, BigDecimal amount, PaymentDetailsRequest details) {

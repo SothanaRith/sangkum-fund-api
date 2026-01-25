@@ -9,11 +9,17 @@ import com.example.digital_donation_api.entity.User;
 import com.example.digital_donation_api.service.DonationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/donations")
@@ -55,13 +61,27 @@ public class DonationController {
     }
     
     @GetMapping("/my-donations")
-    public ResponseEntity<List<DonationResponse>> getMyDonations(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> getMyDonations(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         User user = (User) authentication.getPrincipal();
-        List<Donation> donations = donationService.getMyDonations(user.getId());
-        List<DonationResponse> responses = donations.stream()
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        
+        Page<Donation> donationPage = donationService.getMyDonations(user.getId(), pageable);
+        List<DonationResponse> responses = donationPage.getContent().stream()
                 .map(DonationMapper::toResponse)
                 .collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(responses);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", responses);
+        response.put("currentPage", donationPage.getNumber());
+        response.put("totalPages", donationPage.getTotalPages());
+        response.put("totalElements", donationPage.getTotalElements());
+        response.put("size", donationPage.getSize());
+        
+        return ResponseEntity.ok(response);
     }
     
     @GetMapping("/{id}")

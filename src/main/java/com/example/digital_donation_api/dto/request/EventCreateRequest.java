@@ -25,4 +25,12 @@ public class EventCreateRequest {
     private String imageUrl;
 
     private String visibility; // PUBLIC / PRIVATE
+    
+    private String location;
+    
+    private Double latitude;
+    
+    private Double longitude;
+    
+    private String category;
 }

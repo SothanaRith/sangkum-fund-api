@@ -81,8 +81,8 @@ public class DashboardController {
     }
 
     private List<Map<String, Object>> getTopEvents(Long userId) {
-        List<Object[]> results = donationRepository.findTopEventsByUser(userId, 5);
-        return results.stream().map(row -> {
+        List<Object[]> results = donationRepository.findTopEventsByUser(userId);
+        return results.stream().limit(5).map(row -> {
             Map<String, Object> map = new HashMap<>();
             map.put("eventName", row[0]);
             map.put("total", ((Number) row[1]).doubleValue());

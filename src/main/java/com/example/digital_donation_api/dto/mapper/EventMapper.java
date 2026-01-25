@@ -1,11 +1,13 @@
 package com.example.digital_donation_api.dto.mapper;
 
+import com.example.digital_donation_api.dto.response.EventImageResponse;
 import com.example.digital_donation_api.dto.response.EventResponse;
 import com.example.digital_donation_api.entity.Event;
 import com.example.digital_donation_api.repository.EventMemberRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.stream.Collectors;
 
 public class EventMapper {
     public static EventResponse toResponse(Event event) {
@@ -39,6 +41,16 @@ public class EventMapper {
             charityLogo = "http://localhost:8080" + charityLogo;
         }
         
+        // Map event images
+        var images = event.getImages().stream()
+                .map(img -> new EventImageResponse(
+                        img.getId(),
+                        img.getImageUrl(),
+                        img.getIsPrimary(),
+                        img.getDisplayOrder()
+                ))
+                .collect(Collectors.toList());
+        
         return new EventResponse(
                 event.getId(),
                 event.getTitle(),
@@ -58,7 +70,12 @@ public class EventMapper {
                 charityLogo,
                 0, // TODO: Get actual donation count from repository
                 participantCount,
-                progressPercentage
+                progressPercentage,
+                images,
+                event.getLocation(),
+                event.getLatitude(),
+                event.getLongitude(),
+                event.getCategory()
         );
     }
 }
