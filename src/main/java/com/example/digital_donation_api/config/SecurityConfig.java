@@ -41,7 +41,9 @@ public class SecurityConfig {
                                 "/api/events",
                                 "/api/events/**",
                                 "/api/charities",
-                                "/api/charities/**"
+                                "/api/charities/**",
+                                "/api/posts",
+                                "/api/posts/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

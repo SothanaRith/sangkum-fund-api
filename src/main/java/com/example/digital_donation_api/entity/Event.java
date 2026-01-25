@@ -48,6 +48,7 @@ public class Event {
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20, columnDefinition = "VARCHAR(20)")
     private EventStatus status = EventStatus.DRAFT;
     
     @Column(name = "rejection_reason")
