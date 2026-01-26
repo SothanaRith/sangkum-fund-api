@@ -4,6 +4,7 @@ import com.example.digital_donation_api.dto.mapper.CharityMapper;
 import com.example.digital_donation_api.dto.mapper.AnnouncementMapper;
 import com.example.digital_donation_api.dto.request.CharityCreateRequest;
 import com.example.digital_donation_api.dto.response.CharityResponse;
+import com.example.digital_donation_api.dto.response.CharityStatsResponse;
 import com.example.digital_donation_api.dto.response.AnnouncementResponse;
 import com.example.digital_donation_api.entity.Announcement;
 import com.example.digital_donation_api.entity.Charity;
@@ -82,6 +83,8 @@ public class CharityController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllCharities(
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -91,7 +94,12 @@ public class CharityController {
         Pageable pageable = PageRequest.of(page, size, sort);
         
         Page<Charity> charityPage;
-        if ("verified".equalsIgnoreCase(status)) {
+        
+        if (search != null && !search.isEmpty()) {
+            charityPage = charityService.searchCharities(search, pageable);
+        } else if (category != null && !category.isEmpty()) {
+            charityPage = charityService.getByCategory(category, pageable);
+        } else if ("verified".equalsIgnoreCase(status)) {
             charityPage = charityService.getVerified(pageable);
         } else {
             charityPage = charityService.getAll(pageable);
@@ -117,6 +125,12 @@ public class CharityController {
     public ResponseEntity<CharityResponse> getCharityById(@PathVariable Long id) {
         Charity charity = charityService.getById(id);
         return ResponseEntity.ok(CharityMapper.toResponse(charity));
+    }
+
+    @GetMapping("/{id}/stats")
+    public ResponseEntity<CharityStatsResponse> getCharityStats(@PathVariable Long id) {
+        CharityStatsResponse stats = charityService.getCharityStats(id);
+        return ResponseEntity.ok(stats);
     }
 
     @GetMapping("/{charityId}/announcements")

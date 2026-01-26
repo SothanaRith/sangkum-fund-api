@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin/events")
+@RequestMapping("/api/admin/event-verification")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class EventVerificationController {

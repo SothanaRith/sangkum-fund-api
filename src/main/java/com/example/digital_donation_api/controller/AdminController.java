@@ -19,16 +19,6 @@ public class AdminController {
 
     private final AdminService adminService;
 
-    @GetMapping("/users")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<UserResponse>> getAllUsers() {
-        List<User> users = adminService.getAllUsers();
-        List<UserResponse> responses = users.stream()
-                .map(UserMapper::toResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(responses);
-    }
-
     @PostMapping("/charities/{charityId}/verify")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> verifyCharity(@PathVariable Long charityId) {

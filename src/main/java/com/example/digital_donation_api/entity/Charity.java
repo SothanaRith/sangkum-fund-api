@@ -49,4 +49,22 @@ public class Charity {
     private CharityStatus status = CharityStatus.PENDING;
 
     private LocalDateTime verifiedAt;
+
+    // Social Media Links
+    private String facebookUrl;
+    private String instagramUrl;
+    private String twitterUrl;
+    
+    // Impact Metrics
+    private Long totalDonations = 0L;
+    private Long beneficiariesCount = 0L;
+    private Long volunteersCount = 0L;
+    private Integer yearsActive = 0;
+    
+    // Additional info
+    private String missionStatement;
+    @Column(columnDefinition = "TEXT")
+    private String achievements;
+    private Double ratingScore = 0.0;
+    private Integer reviewCount = 0;
 }

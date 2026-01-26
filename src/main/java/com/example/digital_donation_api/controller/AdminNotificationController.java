@@ -41,12 +41,12 @@ public class AdminNotificationController {
             if (read != null && type != null) {
                 try {
                     NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
-                    notificationPage = notificationRepository.findByReadAndType(read, notificationType, pageable);
+                    notificationPage = notificationRepository.findByIsReadAndType(read, notificationType, pageable);
                 } catch (IllegalArgumentException e) {
-                    notificationPage = notificationRepository.findByRead(read, pageable);
+                    notificationPage = notificationRepository.findByIsRead(read, pageable);
                 }
             } else if (read != null) {
-                notificationPage = notificationRepository.findByRead(read, pageable);
+                notificationPage = notificationRepository.findByIsRead(read, pageable);
             } else if (type != null) {
                 try {
                     NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
@@ -89,7 +89,7 @@ public class AdminNotificationController {
     ) {
         try {
             Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Notification> pendingNotifications = notificationRepository.findByRead(false, pageable);
+            Page<Notification> pendingNotifications = notificationRepository.findByIsRead(false, pageable);
 
             List<Map<String, Object>> responses = pendingNotifications.getContent().stream()
                     .map(this::mapNotification)
@@ -99,7 +99,7 @@ public class AdminNotificationController {
             response.put("success", true);
             response.put("content", responses);
             response.put("count", pendingNotifications.getTotalElements());
-            response.put("unreadCount", notificationRepository.countByRead(false));
+            response.put("unreadCount", notificationRepository.countByIsRead(false));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -218,7 +218,7 @@ public class AdminNotificationController {
     @PostMapping("/read-all")
     public ResponseEntity<Map<String, Object>> markAllAsRead() {
         try {
-            List<Notification> unreadNotifications = notificationRepository.findByRead(false);
+            List<Notification> unreadNotifications = notificationRepository.findByIsRead(false);
             unreadNotifications.forEach(notif -> {
                 notif.setIsRead(true);
                 notif.setReadAt(LocalDateTime.now());
@@ -311,8 +311,8 @@ public class AdminNotificationController {
     public ResponseEntity<Map<String, Object>> getNotificationStats() {
         try {
             long totalNotifications = notificationRepository.count();
-            long unreadCount = notificationRepository.countByRead(false);
-            long dismissedCount = notificationRepository.countByDismissed(true);
+            long unreadCount = notificationRepository.countByIsRead(false);
+            long dismissedCount = notificationRepository.countByIsDismissed(true);
 
             Map<String, Long> typeCount = new HashMap<>();
             for (NotificationType type : NotificationType.values()) {

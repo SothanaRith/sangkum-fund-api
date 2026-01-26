@@ -17,7 +17,18 @@ public class CharityMapper {
                 charity.getWebsite(),
                 charity.getCategory(),
                 charity.getStatus().name(),
-                charity.getVerifiedAt()
+                charity.getVerifiedAt(),
+                charity.getFacebookUrl(),
+                charity.getInstagramUrl(),
+                charity.getTwitterUrl(),
+                charity.getTotalDonations(),
+                charity.getBeneficiariesCount(),
+                charity.getVolunteersCount(),
+                charity.getYearsActive(),
+                charity.getMissionStatement(),
+                charity.getAchievements(),
+                charity.getRatingScore(),
+                charity.getReviewCount()
         );
     }
 }

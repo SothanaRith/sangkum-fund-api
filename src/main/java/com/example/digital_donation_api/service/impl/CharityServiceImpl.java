@@ -3,6 +3,7 @@ package com.example.digital_donation_api.service.impl;
 import com.example.digital_donation_api.entity.Charity;
 import com.example.digital_donation_api.entity.CharityStatus;
 import com.example.digital_donation_api.entity.User;
+import com.example.digital_donation_api.dto.response.CharityStatsResponse;
 import com.example.digital_donation_api.exception.ResourceNotFoundException;
 import com.example.digital_donation_api.repository.CharityRepository;
 import com.example.digital_donation_api.repository.UserRepository;
@@ -96,5 +97,45 @@ public class CharityServiceImpl implements CharityService {
                 .orElseThrow(() -> new ResourceNotFoundException("Charity not found"));
         charity.setStatus(CharityStatus.VERIFIED);
         charity.setVerifiedAt(LocalDateTime.now());
+    }
+    
+    @Override
+    public CharityStatsResponse getCharityStats(Long charityId) {
+        Charity charity = getById(charityId);
+        
+        // Calculate derived stats
+        Long totalDonorsCount = 0L; // Would need a Donation service to calculate
+        Long totalRaisedAmount = 0L; // Would need a Donation service to calculate
+        Long totalEvents = 0L; // Would need an Event service to calculate
+        Long activeEventsCount = 0L; // Would need an Event service to calculate
+        Long activeProjects = 0L; // Would need a Project service to calculate
+        String impactPercentage = "0%"; // Would need to calculate from events
+        
+        return CharityStatsResponse.builder()
+                .charityId(charity.getId())
+                .charityName(charity.getName())
+                .totalDonations(charity.getTotalDonations())
+                .beneficiariesCount(charity.getBeneficiariesCount())
+                .volunteersCount(charity.getVolunteersCount())
+                .yearsActive(charity.getYearsActive())
+                .totalEvents(totalEvents)
+                .activeEventsCount(activeEventsCount)
+                .totalDonorsCount(totalDonorsCount)
+                .totalRaisedAmount(totalRaisedAmount)
+                .averageRating(charity.getRatingScore())
+                .reviewCount(charity.getReviewCount())
+                .activeProjects(activeProjects)
+                .impactPercentage(impactPercentage)
+                .build();
+    }
+    
+    @Override
+    public Page<Charity> searchCharities(String keyword, Pageable pageable) {
+        return charityRepository.searchByKeyword(keyword, pageable);
+    }
+    
+    @Override
+    public Page<Charity> getByCategory(String category, Pageable pageable) {
+        return charityRepository.findVerifiedByCategory(category, pageable);
     }
 }

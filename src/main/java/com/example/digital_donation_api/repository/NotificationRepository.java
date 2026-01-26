@@ -18,25 +18,25 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long countByUserIdAndIsReadFalse(Long userId);
 
     // New admin notification methods
-    Page<Notification> findByRead(boolean read, Pageable pageable);
+    Page<Notification> findByIsRead(boolean isRead, Pageable pageable);
 
-    List<Notification> findByRead(boolean read);
+    List<Notification> findByIsRead(boolean isRead);
 
     Page<Notification> findByType(NotificationType type, Pageable pageable);
 
-    Page<Notification> findByReadAndType(boolean read, NotificationType type, Pageable pageable);
+    Page<Notification> findByIsReadAndType(boolean isRead, NotificationType type, Pageable pageable);
 
-    Page<Notification> findByDismissed(boolean dismissed, Pageable pageable);
+    Page<Notification> findByIsDismissed(boolean isDismissed, Pageable pageable);
 
     // Notification counting
-    long countByRead(boolean read);
+    long countByIsRead(boolean isRead);
 
-    long countByDismissed(boolean dismissed);
+    long countByIsDismissed(boolean isDismissed);
 
     long countByType(NotificationType type);
 
     // Notification retrieval
     List<Notification> findAllByOrderByCreatedAtDesc();
 
-    List<Notification> findByReadOrderByCreatedAtDesc(boolean read);
+    List<Notification> findByIsReadOrderByCreatedAtDesc(boolean isRead);
 }
