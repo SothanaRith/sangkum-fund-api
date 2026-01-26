@@ -1,6 +1,7 @@
 package com.example.digital_donation_api.repository;
 
 import com.example.digital_donation_api.entity.Donation;
+import com.example.digital_donation_api.entity.DonationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,7 +19,39 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
 
     List<Donation> findTop5ByEventIdOrderByCreatedAtDesc(Long eventId);
 
+    List<Donation> findByUserId(Long userId);
+
     Page<Donation> findByUserId(Long userId, Pageable pageable);
+    
+    Page<Donation> findByStatus(DonationStatus status, Pageable pageable);
+    
+    long countByStatus(DonationStatus status);
+    
+    @Query("SELECT COALESCE(SUM(d.amount), 0) FROM Donation d WHERE d.status = :status")
+    BigDecimal sumAmountByStatus(@Param("status") DonationStatus status);
+    
+    @Query("""
+        SELECT d FROM Donation d 
+        WHERE d.status = :status 
+        AND (LOWER(d.user.name) LIKE LOWER(CONCAT('%', :search, '%'))
+        OR LOWER(d.event.title) LIKE LOWER(CONCAT('%', :search, '%'))
+        OR LOWER(d.transactionRef) LIKE LOWER(CONCAT('%', :search, '%')))
+        ORDER BY d.createdAt DESC
+    """)
+    Page<Donation> findByStatusAndSearch(
+            @Param("status") DonationStatus status,
+            @Param("search") String search,
+            Pageable pageable
+    );
+    
+    @Query("""
+        SELECT d FROM Donation d 
+        WHERE LOWER(d.user.name) LIKE LOWER(CONCAT('%', :search, '%'))
+        OR LOWER(d.event.title) LIKE LOWER(CONCAT('%', :search, '%'))
+        OR LOWER(d.transactionRef) LIKE LOWER(CONCAT('%', :search, '%'))
+        ORDER BY d.createdAt DESC
+    """)
+    Page<Donation> findBySearch(@Param("search") String search, Pageable pageable);
 
     @Query("""
         SELECT COALESCE(SUM(d.amount), 0)

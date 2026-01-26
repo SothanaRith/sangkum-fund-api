@@ -35,4 +35,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findByStatus(PostStatus status, Pageable pageable);
 
     Page<Post> findByStatusAndFeaturedTrueOrderByPublishedAtDesc(PostStatus status, Pageable pageable);
+
+    // Admin-specific query methods
+    long countByStatus(PostStatus status);
+
+    long countByFeatured(Boolean featured);
 }

@@ -1,6 +1,7 @@
 package com.example.digital_donation_api.service.impl;
 
 import com.example.digital_donation_api.entity.Notification;
+import com.example.digital_donation_api.entity.NotificationType;
 import com.example.digital_donation_api.entity.User;
 import com.example.digital_donation_api.repository.NotificationRepository;
 import com.example.digital_donation_api.repository.UserRepository;
@@ -21,7 +22,11 @@ public class NotificationServiceImpl implements NotificationService {
 
         Notification notification = new Notification();
         notification.setUser(user);
-        notification.setType(type);
+        try {
+            notification.setType(NotificationType.valueOf(type.toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            notification.setType(NotificationType.INFO);
+        }
         notification.setData(data);
 
         notificationRepository.save(notification);

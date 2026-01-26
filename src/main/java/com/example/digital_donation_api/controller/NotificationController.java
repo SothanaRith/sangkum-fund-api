@@ -134,7 +134,7 @@ public class NotificationController {
     private NotificationResponse mapToResponse(Notification notification) {
         NotificationResponse response = new NotificationResponse();
         response.setId(notification.getId());
-        response.setType(notification.getType());
+        response.setType(notification.getType().name());
         response.setData(notification.getData());
         response.setIsRead(notification.getIsRead());
         response.setCreatedAt(notification.getCreatedAt().toString());
