@@ -1,342 +1,145 @@
 package com.example.digital_donation_api.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.digital_donation_api.dto.mapper.PostMapper;
+import com.example.digital_donation_api.dto.response.PostResponse;
+import com.example.digital_donation_api.entity.Post;
+import com.example.digital_donation_api.entity.User;
+import com.example.digital_donation_api.service.PostService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import com.example.digital_donation_api.entity.Post;
-import com.example.digital_donation_api.entity.PostStatus;
-import com.example.digital_donation_api.repository.PostRepository;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/blog")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class AdminBlogController {
-    
-    private final PostRepository postRepository;
-    
-    @Autowired
-    public AdminBlogController(PostRepository postRepository) {
-        this.postRepository = postRepository;
-    }
-    
+
+    private final PostService postService;
+
     // 1. Get all blog articles with pagination
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllArticles(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size,
-        @RequestParam(required = false) String status
+    public ResponseEntity<?> getAllArticles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String status
     ) {
-        try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Post> articlePage;
-            
-            if (status != null && !status.isEmpty()) {
-                PostStatus postStatus = status.equals("published") ? PostStatus.PUBLISHED : PostStatus.DRAFT;
-                articlePage = postRepository.findByStatus(postStatus, pageable);
-            } else {
-                articlePage = postRepository.findAll(pageable);
-            }
-            
-            return ResponseEntity.ok(mapArticles(articlePage));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+        Page<Post> articlePage = postService.getAll(page, size, status);
+        return ResponseEntity.ok(pageResponse(articlePage));
     }
-    
+
     // 2. Get published articles only
     @GetMapping("/published")
-    public ResponseEntity<Map<String, Object>> getPublishedArticles(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size
+    public ResponseEntity<?> getPublishedArticles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Post> publishedPage = postRepository.findByStatus(PostStatus.PUBLISHED, pageable);
-            
-            return ResponseEntity.ok(mapArticles(publishedPage));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+        Page<Post> publishedPage = postService.getAll(page, size, "PUBLISHED");
+        return ResponseEntity.ok(pageResponse(publishedPage));
     }
-    
+
     // 3. Get draft articles only
     @GetMapping("/drafts")
-    public ResponseEntity<Map<String, Object>> getDraftArticles(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size
+    public ResponseEntity<?> getDraftArticles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Post> draftPage = postRepository.findByStatus(PostStatus.DRAFT, pageable);
-            
-            return ResponseEntity.ok(mapArticles(draftPage));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+        Page<Post> draftPage = postService.getAll(page, size, "DRAFT");
+        return ResponseEntity.ok(pageResponse(draftPage));
     }
-    
+
     // 4. Get single article by ID
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getArticle(@PathVariable Long id) {
-        try {
-            Post article = postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Article not found"));
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "data", article
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+    public ResponseEntity<PostResponse> getArticle(@PathVariable Long id) {
+        return ResponseEntity.ok(PostMapper.toResponse(postService.getById(id)));
     }
-    
+
     // 5. Get article by slug
     @GetMapping("/slug/{slug}")
-    public ResponseEntity<Map<String, Object>> getArticleBySlug(@PathVariable String slug) {
-        try {
-            Post article = postRepository.findBySlug(slug)
-                .orElseThrow(() -> new RuntimeException("Article not found"));
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "data", article
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+    public ResponseEntity<PostResponse> getArticleBySlug(@PathVariable String slug) {
+        return ResponseEntity.ok(PostMapper.toResponse(postService.getBySlugAdmin(slug)));
     }
-    
+
     // 6. Create new article
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createArticle(@jakarta.validation.Valid @RequestBody Post article) {
-        try {
-            if (article.getTitle() == null || article.getTitle().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "error", "Title is required"
-                ));
-            }
-            
-            article.setCreatedAt(LocalDateTime.now());
-            article.setUpdatedAt(LocalDateTime.now());
-            
-            // Generate slug if not provided
-            if (article.getSlug() == null || article.getSlug().isEmpty()) {
-                article.setSlug(generateSlug(article.getTitle()));
-            }
-            
-            Post saved = postRepository.save(article);
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "success", true,
-                "message", "Article created successfully",
-                "data", saved,
-                "id", saved.getId()
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+    public ResponseEntity<PostResponse> createArticle(
+            @RequestBody Post article,
+            Authentication authentication
+    ) {
+        User admin = (User) authentication.getPrincipal();
+        Post created = postService.create(article, admin.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(PostMapper.toResponse(created));
     }
-    
+
     // 7. Update article
     @PutMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> updateArticle(
-        @PathVariable Long id,
-        @jakarta.validation.Valid @RequestBody Post articleUpdate
+    public ResponseEntity<PostResponse> updateArticle(
+            @PathVariable Long id,
+            @RequestBody Post articleUpdate
     ) {
-        try {
-            Post article = postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Article not found"));
-            
-            if (articleUpdate.getTitle() != null) {
-                article.setTitle(articleUpdate.getTitle());
-            }
-            if (articleUpdate.getSlug() != null) {
-                article.setSlug(articleUpdate.getSlug());
-            }
-            if (articleUpdate.getExcerpt() != null) {
-                article.setExcerpt(articleUpdate.getExcerpt());
-            }
-            if (articleUpdate.getContent() != null) {
-                article.setContent(articleUpdate.getContent());
-            }
-            if (articleUpdate.getCoverImageUrl() != null) {
-                article.setCoverImageUrl(articleUpdate.getCoverImageUrl());
-            }
-            if (articleUpdate.getAuthor() != null) {
-                article.setAuthor(articleUpdate.getAuthor());
-            }
-            if (articleUpdate.getStatus() != null) {
-                article.setStatus(articleUpdate.getStatus());
-            }
-            if (articleUpdate.getTags() != null) {
-                article.setTags(articleUpdate.getTags());
-            }
-            if (articleUpdate.getFeatured() != null) {
-                article.setFeatured(articleUpdate.getFeatured());
-            }
-            
-            article.setUpdatedAt(LocalDateTime.now());
-            
-            Post updated = postRepository.save(article);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Article updated successfully",
-                "data", updated
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+        Post existing = postService.getById(id);
+        Long authorId = existing.getAuthor() != null ? existing.getAuthor().getId() : null;
+        Post updated = postService.update(id, articleUpdate, authorId);
+        return ResponseEntity.ok(PostMapper.toResponse(updated));
     }
-    
+
     // 8. Delete article
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteArticle(@PathVariable Long id) {
-        try {
-            if (!postRepository.existsById(id)) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("success", false, "error", "Article not found"));
-            }
-            
-            postRepository.deleteById(id);
-            
-            return ResponseEntity.ok(Map.of(
+        Post existing = postService.getById(id);
+        Long authorId = existing.getAuthor() != null ? existing.getAuthor().getId() : null;
+        postService.delete(id, authorId);
+        return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Article deleted successfully",
                 "id", id
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+        ));
     }
-    
+
     // 9. Publish article
     @PostMapping("/{id}/publish")
-    public ResponseEntity<Map<String, Object>> publishArticle(@PathVariable Long id) {
-        try {
-            Post article = postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Article not found"));
-            
-            article.setStatus(PostStatus.PUBLISHED);
-            article.setPublishedAt(LocalDateTime.now());
-            article.setUpdatedAt(LocalDateTime.now());
-            
-            Post updated = postRepository.save(article);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Article published successfully",
-                "data", updated
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+    public ResponseEntity<PostResponse> publishArticle(@PathVariable Long id) {
+        return ResponseEntity.ok(PostMapper.toResponse(postService.publish(id)));
     }
-    
+
     // 10. Unpublish article
     @PostMapping("/{id}/unpublish")
-    public ResponseEntity<Map<String, Object>> unpublishArticle(@PathVariable Long id) {
-        try {
-            Post article = postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Article not found"));
-            
-            article.setStatus(PostStatus.DRAFT);
-            article.setUpdatedAt(LocalDateTime.now());
-            
-            Post updated = postRepository.save(article);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Article unpublished successfully",
-                "data", updated
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+    public ResponseEntity<PostResponse> unpublishArticle(@PathVariable Long id) {
+        return ResponseEntity.ok(PostMapper.toResponse(postService.unpublish(id)));
     }
-    
+
     // 11. Get blog statistics
     @GetMapping("/stats/overview")
-    public ResponseEntity<Map<String, Object>> getBlogStats() {
-        try {
-            Map<String, Object> stats = new HashMap<>();
-            
-            stats.put("success", true);
-            stats.put("totalArticles", postRepository.count());
-            stats.put("publishedCount", postRepository.countByStatus(PostStatus.PUBLISHED));
-            stats.put("draftCount", postRepository.countByStatus(PostStatus.DRAFT));
-            stats.put("featuredCount", postRepository.countByFeatured(true));
-            
-            return ResponseEntity.ok(stats);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, Long>> getBlogStats() {
+        return ResponseEntity.ok(postService.getStats());
     }
-    
+
     // 12. Get recent articles
     @GetMapping("/recent")
     public ResponseEntity<Map<String, Object>> getRecentArticles(
-        @RequestParam(defaultValue = "5") int limit
+            @RequestParam(defaultValue = "5") int limit
     ) {
-        try {
-            List<Post> recent = postRepository.findAll(Sort.by("createdAt").descending())
-                .stream()
-                .limit(limit)
-                .collect(Collectors.toList());
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "content", recent,
+        List<Post> recent = postService.getRecent(limit);
+        return ResponseEntity.ok(Map.of(
+                "content", recent.stream().map(PostMapper::toResponse).toList(),
                 "count", recent.size()
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("success", false, "error", e.getMessage()));
-        }
+        ));
     }
-    
-    // Helper method to map article page response
-    private Map<String, Object> mapArticles(Page<Post> page) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("content", page.getContent());
-        response.put("pageNumber", page.getNumber());
-        response.put("pageSize", page.getSize());
-        response.put("totalElements", page.getTotalElements());
-        response.put("totalPages", page.getTotalPages());
-        return response;
-    }
-    
-    // Helper method to generate slug from title
-    private String generateSlug(String title) {
-        return title
-            .toLowerCase()
-            .replaceAll("[^a-z0-9]+", "-")
-            .replaceAll("^-+|-+$", "");
+
+    // Helper method to build paginated response
+    private Map<String, Object> pageResponse(Page<Post> page) {
+        return Map.of(
+                "content", page.getContent().stream().map(PostMapper::toResponse).toList(),
+                "totalElements", page.getTotalElements(),
+                "totalPages", page.getTotalPages(),
+                "pageNumber", page.getNumber()
+        );
     }
 }

@@ -7,6 +7,7 @@ import com.example.digital_donation_api.dto.response.PaymentResponse;
 import com.example.digital_donation_api.entity.Donation;
 import com.example.digital_donation_api.entity.User;
 import com.example.digital_donation_api.service.DonationService;
+import com.example.digital_donation_api.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,7 @@ import java.util.Map;
 public class DonationController {
 
     private final DonationService donationService;
+    private final NotificationService notificationService;
 
     @PostMapping
     public ResponseEntity<PaymentResponse> makeDonation(
@@ -43,6 +45,21 @@ public class DonationController {
                 request.getPaymentMethod(),
                 request.getPaymentDetails()
         );
+
+        // Notify event owner (skip if owner donated to their own event)
+        var event = donation.getEvent();
+        if (event != null && event.getOwner() != null && !event.getOwner().getId().equals(user.getId())) {
+            String donorName = Boolean.TRUE.equals(donation.getIsAnonymous()) ? "Someone" : user.getName();
+            notificationService.notify(
+                    event.getOwner().getId(),
+                    "New Donation on Your Campaign",
+                    donorName + " donated $" + donation.getAmount() + " to \"" + event.getTitle() + "\"",
+                    "DONATION",
+                    "/events/" + event.getId(),
+                    event.getId(),
+                    "EVENT"
+            );
+        }
 
         PaymentResponse response = new PaymentResponse(
                 donation.getId(),

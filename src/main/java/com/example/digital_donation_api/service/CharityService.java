@@ -20,7 +20,11 @@ public interface CharityService {
     Charity getById(Long id);
 
     void verify(Long charityId);
-    
+
+    void reject(Long charityId);
+
+    void delete(Long charityId);
+
     // New impact and stats methods
     CharityStatsResponse getCharityStats(Long charityId);
     

@@ -22,6 +22,8 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
 
     java.util.Optional<Donation> findByTransactionRef(String transactionRef);
 
+    long countByEventIdAndStatus(Long eventId, DonationStatus status);
+
     List<Donation> findTop5ByEventIdOrderByCreatedAtDesc(Long eventId);
 
     List<Donation> findByUserId(Long userId);

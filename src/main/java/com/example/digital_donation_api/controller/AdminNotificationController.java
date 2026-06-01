@@ -2,6 +2,7 @@ package com.example.digital_donation_api.controller;
 
 import com.example.digital_donation_api.entity.Notification;
 import com.example.digital_donation_api.entity.NotificationType;
+import com.example.digital_donation_api.exception.ResourceNotFoundException;
 import com.example.digital_donation_api.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -10,11 +11,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/notifications")
@@ -24,9 +26,6 @@ public class AdminNotificationController {
 
     private final NotificationRepository notificationRepository;
 
-    /**
-     * Get all notifications with pagination
-     */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllNotifications(
             @RequestParam(defaultValue = "0") int page,
@@ -34,353 +33,167 @@ public class AdminNotificationController {
             @RequestParam(required = false) Boolean read,
             @RequestParam(required = false) String type
     ) {
-        try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Notification> notificationPage;
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Notification> notificationPage;
 
-            if (read != null && type != null) {
-                try {
-                    NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
-                    notificationPage = notificationRepository.findByIsReadAndType(read, notificationType, pageable);
-                } catch (IllegalArgumentException e) {
-                    notificationPage = notificationRepository.findByIsRead(read, pageable);
-                }
-            } else if (read != null) {
-                notificationPage = notificationRepository.findByIsRead(read, pageable);
-            } else if (type != null) {
-                try {
-                    NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
-                    notificationPage = notificationRepository.findByType(notificationType, pageable);
-                } catch (IllegalArgumentException e) {
-                    notificationPage = Page.empty(pageable);
-                }
-            } else {
-                notificationPage = notificationRepository.findAll(pageable);
-            }
-
-            List<Map<String, Object>> responses = notificationPage.getContent().stream()
-                    .map(this::mapNotification)
-                    .toList();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("content", responses);
-            response.put("pageNumber", notificationPage.getNumber());
-            response.put("pageSize", notificationPage.getSize());
-            response.put("totalElements", notificationPage.getTotalElements());
-            response.put("totalPages", notificationPage.getTotalPages());
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch notifications: " + e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+        if (read != null && type != null) {
+            NotificationType nt = parseType(type);
+            notificationPage = nt != null
+                    ? notificationRepository.findByIsReadAndType(read, nt, pageable)
+                    : notificationRepository.findByIsRead(read, pageable);
+        } else if (read != null) {
+            notificationPage = notificationRepository.findByIsRead(read, pageable);
+        } else if (type != null) {
+            NotificationType nt = parseType(type);
+            notificationPage = nt != null
+                    ? notificationRepository.findByType(nt, pageable)
+                    : Page.empty(pageable);
+        } else {
+            notificationPage = notificationRepository.findAll(pageable);
         }
+
+        return ResponseEntity.ok(pageResponse(notificationPage));
     }
 
-    /**
-     * Get pending notifications only
-     */
     @GetMapping("/pending")
     public ResponseEntity<Map<String, Object>> getPendingNotifications(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Notification> pendingNotifications = notificationRepository.findByIsRead(false, pageable);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Notification> pending = notificationRepository.findByIsRead(false, pageable);
 
-            List<Map<String, Object>> responses = pendingNotifications.getContent().stream()
-                    .map(this::mapNotification)
-                    .toList();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("content", responses);
-            response.put("count", pendingNotifications.getTotalElements());
-            response.put("unreadCount", notificationRepository.countByIsRead(false));
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error fetching pending notifications: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        Map<String, Object> response = pageResponse(pending);
+        response.put("unreadCount", notificationRepository.countByIsRead(false));
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * Get system notifications
-     */
     @GetMapping("/system")
     public ResponseEntity<Map<String, Object>> getSystemNotifications(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size
     ) {
-        try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Notification> systemNotifications = notificationRepository.findByType(NotificationType.SYSTEM, pageable);
-
-            List<Map<String, Object>> responses = systemNotifications.getContent().stream()
-                    .map(this::mapNotification)
-                    .toList();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("content", responses);
-            response.put("count", systemNotifications.getTotalElements());
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error fetching system notifications: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Notification> systemNotifications = notificationRepository.findByType(NotificationType.SYSTEM, pageable);
+        return ResponseEntity.ok(pageResponse(systemNotifications));
     }
 
-    /**
-     * Get notifications by type
-     */
     @GetMapping("/type/{type}")
     public ResponseEntity<Map<String, Object>> getNotificationsByType(
             @PathVariable String type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size
     ) {
-        try {
-            NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-            Page<Notification> typeNotifications = notificationRepository.findByType(notificationType, pageable);
+        NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Notification> result = notificationRepository.findByType(notificationType, pageable);
 
-            List<Map<String, Object>> responses = typeNotifications.getContent().stream()
-                    .map(this::mapNotification)
-                    .toList();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("type", type);
-            response.put("content", responses);
-            response.put("count", typeNotifications.getTotalElements());
-
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Invalid notification type: " + type);
-            return ResponseEntity.badRequest().body(errorResponse);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error fetching notifications: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        Map<String, Object> response = pageResponse(result);
+        response.put("type", type);
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * Mark notification as read
-     */
     @PostMapping("/{notificationId}/read")
     public ResponseEntity<Map<String, Object>> markAsRead(@PathVariable Long notificationId) {
-        try {
-            Optional<Notification> notification = notificationRepository.findById(notificationId);
-
-            if (notification.isEmpty()) {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("success", false);
-                errorResponse.put("message", "Notification not found");
-                return ResponseEntity.status(404).body(errorResponse);
-            }
-
-            Notification notif = notification.get();
-            notif.setIsRead(true);
-            notif.setReadAt(LocalDateTime.now());
-            notificationRepository.save(notif);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Notification marked as read");
-            response.put("id", notificationId);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error marking notification as read: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        Notification notif = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+        notif.setIsRead(true);
+        notif.setReadAt(LocalDateTime.now());
+        notificationRepository.save(notif);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Notification marked as read", "id", notificationId));
     }
 
-    /**
-     * Mark all notifications as read
-     */
     @PostMapping("/read-all")
     public ResponseEntity<Map<String, Object>> markAllAsRead() {
-        try {
-            List<Notification> unreadNotifications = notificationRepository.findByIsRead(false);
-            unreadNotifications.forEach(notif -> {
-                notif.setIsRead(true);
-                notif.setReadAt(LocalDateTime.now());
-            });
-            notificationRepository.saveAll(unreadNotifications);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "All notifications marked as read");
-            response.put("count", unreadNotifications.size());
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error marking all notifications as read: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        List<Notification> unread = notificationRepository.findByIsRead(false);
+        unread.forEach(n -> {
+            n.setIsRead(true);
+            n.setReadAt(LocalDateTime.now());
+        });
+        notificationRepository.saveAll(unread);
+        return ResponseEntity.ok(Map.of("success", true, "message", "All notifications marked as read", "count", unread.size()));
     }
 
-    /**
-     * Delete notification
-     */
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<Map<String, Object>> deleteNotification(@PathVariable Long notificationId) {
-        try {
-            Optional<Notification> notification = notificationRepository.findById(notificationId);
-
-            if (notification.isEmpty()) {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("success", false);
-                errorResponse.put("message", "Notification not found");
-                return ResponseEntity.status(404).body(errorResponse);
-            }
-
-            notificationRepository.deleteById(notificationId);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Notification deleted");
-            response.put("id", notificationId);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error deleting notification: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
+        if (!notificationRepository.existsById(notificationId)) {
+            throw new ResourceNotFoundException("Notification not found");
         }
+        notificationRepository.deleteById(notificationId);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Notification deleted", "id", notificationId));
     }
 
-    /**
-     * Dismiss notification (soft delete - for archiving)
-     */
     @PostMapping("/{notificationId}/dismiss")
     public ResponseEntity<Map<String, Object>> dismissNotification(@PathVariable Long notificationId) {
-        try {
-            Optional<Notification> notification = notificationRepository.findById(notificationId);
-
-            if (notification.isEmpty()) {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("success", false);
-                errorResponse.put("message", "Notification not found");
-                return ResponseEntity.status(404).body(errorResponse);
-            }
-
-            Notification notif = notification.get();
-            notif.setIsDismissed(true);
-            notif.setDismissedAt(LocalDateTime.now());
-            notificationRepository.save(notif);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Notification dismissed");
-            response.put("id", notificationId);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error dismissing notification: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        Notification notif = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+        notif.setIsDismissed(true);
+        notif.setDismissedAt(LocalDateTime.now());
+        notificationRepository.save(notif);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Notification dismissed", "id", notificationId));
     }
 
-    /**
-     * Get notification statistics
-     */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getNotificationStats() {
-        try {
-            long totalNotifications = notificationRepository.count();
-            long unreadCount = notificationRepository.countByIsRead(false);
-            long dismissedCount = notificationRepository.countByIsDismissed(true);
+        long total = notificationRepository.count();
+        long unread = notificationRepository.countByIsRead(false);
+        long dismissed = notificationRepository.countByIsDismissed(true);
 
-            Map<String, Long> typeCount = new HashMap<>();
-            for (NotificationType type : NotificationType.values()) {
-                typeCount.put(type.name(), notificationRepository.countByType(type));
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("totalNotifications", totalNotifications);
-            response.put("unreadCount", unreadCount);
-            response.put("dismissedCount", dismissedCount);
-            response.put("readCount", totalNotifications - unreadCount - dismissedCount);
-            response.put("typeCount", typeCount);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error calculating statistics: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
+        Map<String, Long> byType = new HashMap<>();
+        for (NotificationType t : NotificationType.values()) {
+            byType.put(t.name(), notificationRepository.countByType(t));
         }
+
+        return ResponseEntity.ok(Map.of(
+                "totalNotifications", total,
+                "unreadCount", unread,
+                "dismissedCount", dismissed,
+                "readCount", total - unread - dismissed,
+                "typeCount", byType
+        ));
     }
 
-    /**
-     * Get recent notifications
-     */
     @GetMapping("/recent")
     public ResponseEntity<Map<String, Object>> getRecentNotifications(
             @RequestParam(defaultValue = "5") int limit
     ) {
+        Pageable pageable = PageRequest.of(0, limit, Sort.by("createdAt").descending());
+        Page<Notification> recent = notificationRepository.findAll(pageable);
+        return ResponseEntity.ok(pageResponse(recent));
+    }
+
+    private NotificationType parseType(String type) {
         try {
-            Pageable pageable = PageRequest.of(0, limit, Sort.by("createdAt").descending());
-            Page<Notification> recentNotifications = notificationRepository.findAll(pageable);
-
-            List<Map<String, Object>> responses = recentNotifications.getContent().stream()
-                    .map(this::mapNotification)
-                    .toList();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("content", responses);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error fetching recent notifications: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
+            return NotificationType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
-    /**
-     * Map notification entity to response DTO
-     */
-    private Map<String, Object> mapNotification(Notification notification) {
+    private Map<String, Object> pageResponse(Page<Notification> page) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", page.getContent().stream().map(this::mapNotification).toList());
+        response.put("pageNumber", page.getNumber());
+        response.put("pageSize", page.getSize());
+        response.put("totalElements", page.getTotalElements());
+        response.put("totalPages", page.getTotalPages());
+        return response;
+    }
+
+    private Map<String, Object> mapNotification(Notification n) {
         Map<String, Object> map = new HashMap<>();
-        map.put("id", notification.getId());
-        map.put("title", notification.getTitle());
-        map.put("message", notification.getMessage());
-        map.put("type", notification.getType());
-        map.put("read", notification.isRead());
-        map.put("dismissed", notification.isDismissed());
-        map.put("actionUrl", notification.getActionUrl());
-        map.put("actionLabel", notification.getActionLabel());
-        map.put("createdAt", notification.getCreatedAt());
-        map.put("readAt", notification.getReadAt());
-        map.put("relatedId", notification.getRelatedId());
-        map.put("relatedType", notification.getRelatedType());
+        map.put("id", n.getId());
+        map.put("title", n.getTitle());
+        map.put("message", n.getMessage());
+        map.put("type", n.getType());
+        map.put("read", n.isRead());
+        map.put("dismissed", n.isDismissed());
+        map.put("actionUrl", n.getActionUrl());
+        map.put("actionLabel", n.getActionLabel());
+        map.put("createdAt", n.getCreatedAt());
+        map.put("readAt", n.getReadAt());
+        map.put("relatedId", n.getRelatedId());
+        map.put("relatedType", n.getRelatedType());
         return map;
     }
 }

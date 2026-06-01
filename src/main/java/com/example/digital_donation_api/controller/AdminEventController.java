@@ -5,6 +5,7 @@ import com.example.digital_donation_api.dto.response.EventResponse;
 import com.example.digital_donation_api.entity.Event;
 import com.example.digital_donation_api.entity.EventStatus;
 import com.example.digital_donation_api.entity.User;
+import com.example.digital_donation_api.exception.ResourceNotFoundException;
 import com.example.digital_donation_api.repository.DonationRepository;
 import com.example.digital_donation_api.repository.EventMemberRepository;
 import com.example.digital_donation_api.repository.EventRepository;
@@ -48,19 +49,19 @@ public class AdminEventController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir
     ) {
-        Sort sort = sortDir.equalsIgnoreCase("asc") ? 
+        Sort sort = sortDir.equalsIgnoreCase("asc") ?
             Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        
+
         Page<Event> eventPage;
-        
+
         if (status != null && !status.isEmpty()) {
             EventStatus eventStatus = EventStatus.valueOf(status.toUpperCase());
             eventPage = eventRepository.findByStatus(eventStatus, pageable);
         } else {
             eventPage = eventRepository.findAll(pageable);
         }
-        
+
         // Filter by search term if provided
         List<EventResponse> responses = eventPage.getContent().stream()
                 .filter(e -> {
@@ -70,9 +71,9 @@ public class AdminEventController {
                            (e.getDescription() != null && e.getDescription().toLowerCase().contains(searchLower)) ||
                            (e.getOwner() != null && e.getOwner().getName().toLowerCase().contains(searchLower));
                 })
-                .map(e -> EventMapper.toResponse(e, eventMemberRepository))
+                .map(e -> EventMapper.toResponse(e, eventMemberRepository, donationRepository))
                 .collect(Collectors.toList());
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("content", responses);
         response.put("currentPage", eventPage.getNumber());
@@ -81,7 +82,7 @@ public class AdminEventController {
         response.put("size", eventPage.getSize());
         response.put("hasNext", eventPage.hasNext());
         response.put("hasPrevious", eventPage.hasPrevious());
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -91,35 +92,35 @@ public class AdminEventController {
     @GetMapping("/{eventId}")
     public ResponseEntity<Map<String, Object>> getEventDetails(@PathVariable Long eventId) {
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
-        
-        EventResponse eventResponse = EventMapper.toResponse(event, eventMemberRepository);
-        
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+
+        EventResponse eventResponse = EventMapper.toResponse(event, eventMemberRepository, donationRepository);
+
         // Calculate funding progress
         BigDecimal raisedAmount = donationRepository.sumSuccessfulDonations(eventId);
         if (raisedAmount == null) {
             raisedAmount = BigDecimal.ZERO;
         }
-        
+
         long donorCount = donationRepository.countDonors(eventId);
         final BigDecimal finalRaisedAmount = raisedAmount;
         final long finalDonorCount = donorCount;
-        
+
         Map<String, Object> details = new HashMap<>();
         details.put("event", eventResponse);
         details.put("fundingProgress", new HashMap<String, Object>() {{
             put("raised", finalRaisedAmount);
             put("goal", event.getGoalAmount());
-            put("percentage", event.getGoalAmount().compareTo(BigDecimal.ZERO) > 0 ? 
+            put("percentage", event.getGoalAmount().compareTo(BigDecimal.ZERO) > 0 ?
                 finalRaisedAmount.multiply(BigDecimal.valueOf(100))
-                    .divide(event.getGoalAmount(), 2, BigDecimal.ROUND_HALF_UP) : 
+                    .divide(event.getGoalAmount(), 2, BigDecimal.ROUND_HALF_UP) :
                 BigDecimal.ZERO);
             put("donorCount", finalDonorCount);
         }});
         details.put("ownerName", event.getOwner() != null ? event.getOwner().getName() : "Unknown");
         details.put("ownerEmail", event.getOwner() != null ? event.getOwner().getEmail() : "Unknown");
         details.put("status", event.getStatus());
-        
+
         return ResponseEntity.ok(details);
     }
 
@@ -130,7 +131,7 @@ public class AdminEventController {
     public ResponseEntity<List<EventResponse>> getPendingEvents() {
         List<Event> pendingEvents = eventService.getPendingEvents();
         List<EventResponse> responses = pendingEvents.stream()
-                .map(e -> EventMapper.toResponse(e, eventMemberRepository))
+                .map(e -> EventMapper.toResponse(e, eventMemberRepository, donationRepository))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -143,23 +144,16 @@ public class AdminEventController {
             @PathVariable Long eventId,
             Authentication authentication
     ) {
-        try {
-            User admin = (User) authentication.getPrincipal();
-            
-            Event approvedEvent = eventService.approveEvent(eventId, admin.getId());
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Event approved successfully");
-            response.put("event", EventMapper.toResponse(approvedEvent, eventMemberRepository));
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
+        User admin = (User) authentication.getPrincipal();
+
+        Event approvedEvent = eventService.approveEvent(eventId, admin.getId());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Event approved successfully");
+        response.put("event", EventMapper.toResponse(approvedEvent, eventMemberRepository, donationRepository));
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -171,23 +165,16 @@ public class AdminEventController {
             @RequestParam(required = false, defaultValue = "No reason provided") String reason,
             Authentication authentication
     ) {
-        try {
-            User admin = (User) authentication.getPrincipal();
-            
-            Event rejectedEvent = eventService.rejectEvent(eventId, admin.getId(), reason);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Event rejected");
-            response.put("event", EventMapper.toResponse(rejectedEvent, eventMemberRepository));
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
+        User admin = (User) authentication.getPrincipal();
+
+        Event rejectedEvent = eventService.rejectEvent(eventId, admin.getId(), reason);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Event rejected");
+        response.put("event", EventMapper.toResponse(rejectedEvent, eventMemberRepository, donationRepository));
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -195,23 +182,16 @@ public class AdminEventController {
      */
     @DeleteMapping("/{eventId}")
     public ResponseEntity<Map<String, Object>> deleteEvent(@PathVariable Long eventId) {
-        try {
-            Event event = eventRepository.findById(eventId)
-                    .orElseThrow(() -> new RuntimeException("Event not found"));
-            
-            eventRepository.delete(event);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Event deleted successfully");
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+
+        eventRepository.delete(event);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Event deleted successfully");
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -226,9 +206,9 @@ public class AdminEventController {
         EventStatus eventStatus = EventStatus.valueOf(status.toUpperCase());
         PageRequest pageable = PageRequest.of(page, size);
         Page<Event> events = eventRepository.findByStatus(eventStatus, pageable);
-        
-        Page<EventResponse> responses = events.map(e -> EventMapper.toResponse(e, eventMemberRepository));
-        
+
+        Page<EventResponse> responses = events.map(e -> EventMapper.toResponse(e, eventMemberRepository, donationRepository));
+
         return ResponseEntity.ok(responses);
     }
 
@@ -243,9 +223,9 @@ public class AdminEventController {
     ) {
         PageRequest pageable = PageRequest.of(page, size);
         Page<Event> events = eventRepository.searchEvents(query, pageable);
-        
-        Page<EventResponse> responses = events.map(e -> EventMapper.toResponse(e, eventMemberRepository));
-        
+
+        Page<EventResponse> responses = events.map(e -> EventMapper.toResponse(e, eventMemberRepository, donationRepository));
+
         return ResponseEntity.ok(responses);
     }
 
@@ -255,20 +235,20 @@ public class AdminEventController {
     @GetMapping("/{eventId}/funding")
     public ResponseEntity<Map<String, Object>> getFundingProgress(@PathVariable Long eventId) {
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
-        
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+
         BigDecimal raisedAmount = donationRepository.sumSuccessfulDonations(eventId);
         if (raisedAmount == null) {
             raisedAmount = BigDecimal.ZERO;
         }
-        
+
         long donorCount = donationRepository.countDonors(eventId);
-        
-        BigDecimal percentage = event.getGoalAmount().compareTo(BigDecimal.ZERO) > 0 ? 
+
+        BigDecimal percentage = event.getGoalAmount().compareTo(BigDecimal.ZERO) > 0 ?
             raisedAmount.multiply(BigDecimal.valueOf(100))
-                .divide(event.getGoalAmount(), 2, BigDecimal.ROUND_HALF_UP) : 
+                .divide(event.getGoalAmount(), 2, BigDecimal.ROUND_HALF_UP) :
             BigDecimal.ZERO;
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("eventId", eventId);
         response.put("eventTitle", event.getTitle());
@@ -278,7 +258,7 @@ public class AdminEventController {
         response.put("donorCount", donorCount);
         response.put("remainingAmount", event.getGoalAmount().subtract(raisedAmount));
         response.put("status", event.getStatus());
-        
+
         return ResponseEntity.ok(response);
     }
 }

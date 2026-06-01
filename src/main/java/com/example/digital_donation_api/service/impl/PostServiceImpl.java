@@ -3,6 +3,7 @@ package com.example.digital_donation_api.service.impl;
 import com.example.digital_donation_api.entity.Post;
 import com.example.digital_donation_api.entity.PostStatus;
 import com.example.digital_donation_api.entity.User;
+import com.example.digital_donation_api.exception.ResourceNotFoundException;
 import com.example.digital_donation_api.repository.PostRepository;
 import com.example.digital_donation_api.repository.UserRepository;
 import com.example.digital_donation_api.service.PostService;
@@ -10,14 +11,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -109,6 +114,63 @@ public class PostServiceImpl implements PostService {
     @Override
     public Optional<Post> getBySlug(String slug) {
         return postRepository.findBySlug(slug);
+    }
+
+    @Override
+    public Page<Post> getAll(int page, int size, String status) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        if (status != null && !status.isBlank()) {
+            PostStatus postStatus = PostStatus.valueOf(status.toUpperCase());
+            return postRepository.findByStatus(postStatus, pageable);
+        }
+        return postRepository.findAll(pageable);
+    }
+
+    @Override
+    public Post getById(Long id) {
+        return postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+    }
+
+    @Override
+    public Post getBySlugAdmin(String slug) {
+        return postRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+    }
+
+    @Override
+    public Post publish(Long id) {
+        Post post = getById(id);
+        post.setStatus(PostStatus.PUBLISHED);
+        post.setPublishedAt(LocalDateTime.now());
+        post.setUpdatedAt(LocalDateTime.now());
+        return postRepository.save(post);
+    }
+
+    @Override
+    public Post unpublish(Long id) {
+        Post post = getById(id);
+        post.setStatus(PostStatus.DRAFT);
+        post.setUpdatedAt(LocalDateTime.now());
+        return postRepository.save(post);
+    }
+
+    @Override
+    public Map<String, Long> getStats() {
+        return Map.of(
+                "totalArticles", postRepository.count(),
+                "publishedCount", postRepository.countByStatus(PostStatus.PUBLISHED),
+                "draftCount", postRepository.countByStatus(PostStatus.DRAFT),
+                "featuredCount", postRepository.countByFeatured(true)
+        );
+    }
+
+    @Override
+    public List<Post> getRecent(int limit) {
+        return postRepository.findAll(Sort.by("createdAt").descending())
+                .stream()
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 
     private String generateSlug(String input) {

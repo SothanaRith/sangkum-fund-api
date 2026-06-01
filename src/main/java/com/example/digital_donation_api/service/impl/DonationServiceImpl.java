@@ -271,8 +271,9 @@ public class DonationServiceImpl implements DonationService {
     }
     
     private void updateEventTotals(Event event, BigDecimal amount, Long eventId) {
-        // Update event total
+        // Update event total and save it explicitly to persist changes
         event.setCurrentAmount(event.getCurrentAmount().add(amount));
+        eventRepository.save(event);
 
         // Update report
         EventReport report = eventReportRepository
@@ -284,7 +285,8 @@ public class DonationServiceImpl implements DonationService {
                 });
 
         report.setTotalDonations(event.getCurrentAmount());
-        report.setTotalDonors(donationRepository.countDonors(eventId).intValue());
+        long donationCount = donationRepository.countByEventIdAndStatus(eventId, DonationStatus.SUCCESS);
+        report.setTotalDonors((int) donationCount);
         report.setLastUpdatedAt(LocalDateTime.now());
 
         eventReportRepository.save(report);

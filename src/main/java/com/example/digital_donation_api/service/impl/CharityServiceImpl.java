@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -99,6 +98,18 @@ public class CharityServiceImpl implements CharityService {
         charity.setVerifiedAt(LocalDateTime.now());
     }
     
+    @Override
+    public void reject(Long charityId) {
+        Charity charity = getById(charityId);
+        charity.setStatus(CharityStatus.REJECTED);
+    }
+
+    @Override
+    public void delete(Long charityId) {
+        getById(charityId); // throws ResourceNotFoundException if missing
+        charityRepository.deleteById(charityId);
+    }
+
     @Override
     public CharityStatsResponse getCharityStats(Long charityId) {
         Charity charity = getById(charityId);

@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,17 +30,10 @@ public class PostController {
 
     private final PostService postService;
 
-    private boolean isAdmin(User user) {
-        return user.getUserRoles().stream()
-                .anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getRole().getName()));
-    }
-
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createPost(@Valid @RequestBody PostRequest request, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        if (!isAdmin(user)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Forbidden"));
-        }
 
         Post post = new Post();
         post.setTitle(request.getTitle());
@@ -61,11 +55,9 @@ public class PostController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updatePost(@PathVariable Long id, @Valid @RequestBody PostRequest request, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        if (!isAdmin(user)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Forbidden"));
-        }
 
         Post post = new Post();
         post.setTitle(request.getTitle());
@@ -85,11 +77,9 @@ public class PostController {
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, Object> payload, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        if (!isAdmin(user)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Forbidden"));
-        }
 
         String status = payload.get("status") != null ? payload.get("status").toString() : null;
         Boolean featured = payload.get("featured") != null ? Boolean.valueOf(payload.get("featured").toString()) : null;
@@ -105,11 +95,9 @@ public class PostController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deletePost(@PathVariable Long id, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        if (!isAdmin(user)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Forbidden"));
-        }
         postService.delete(id, user.getId());
         return ResponseEntity.noContent().build();
     }
@@ -154,11 +142,8 @@ public class PostController {
     @GetMapping("/{slug}")
     public ResponseEntity<?> getBySlug(@PathVariable String slug, @RequestParam(defaultValue = "false") boolean includeDraft, Authentication authentication) {
         if (includeDraft) {
-            if (authentication == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Forbidden"));
-            }
-            User user = (User) authentication.getPrincipal();
-            if (!isAdmin(user)) {
+            if (authentication == null || authentication.getAuthorities().stream()
+                    .noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Forbidden"));
             }
             return postService.getBySlug(slug)

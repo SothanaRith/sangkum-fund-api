@@ -27,6 +27,8 @@ public class EventResponse {
     private String charityName;
     private String charityLogo;
     private Integer donationCount;
+    private Integer donorsCount;
+    private Integer donors;
     private Integer participantCount;
     private Double progressPercentage;
     private List<EventImageResponse> images;

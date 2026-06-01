@@ -1,5 +1,6 @@
 package com.example.digital_donation_api.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,16 +22,18 @@ public class SettingsResponse {
     @NoArgsConstructor
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PrivacySettings {
         private Boolean profileVisible;
         private Boolean showDonations;
         private Boolean showEmail;
     }
-    
+
     @AllArgsConstructor
     @NoArgsConstructor
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class NotificationSettings {
         private Boolean emailNotifications;
         private Boolean donationAlerts;
@@ -38,11 +41,12 @@ public class SettingsResponse {
         private Boolean milestoneAlerts;
         private Boolean telegramNotifications;
     }
-    
+
     @AllArgsConstructor
     @NoArgsConstructor
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TelegramSettings {
         private Boolean connected;
         private String chatId;
@@ -53,6 +57,7 @@ public class SettingsResponse {
     @NoArgsConstructor
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SecuritySettings {
         private Boolean twoFactorEnabled;
         private Boolean loginAlerts;

@@ -31,6 +31,7 @@ import com.example.digital_donation_api.repository.AnnouncementCommentRepository
 import com.example.digital_donation_api.repository.AnnouncementCommentReactionRepository;
 import com.example.digital_donation_api.repository.EventTimelineRepository;
 import com.example.digital_donation_api.service.EventService;
+import com.example.digital_donation_api.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -53,6 +54,7 @@ import java.util.stream.Collectors;
 public class EventController {
 
     private final EventService eventService;
+    private final NotificationService notificationService;
     private final EventMemberRepository eventMemberRepository;
     private final EventTimelineRepository eventTimelineRepository;
     private final AnnouncementRepository announcementRepository;
@@ -93,7 +95,7 @@ public class EventController {
         }
         
         Event createdEvent = eventService.create(event, user.getId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(EventMapper.toResponse(createdEvent, eventMemberRepository));
+        return ResponseEntity.status(HttpStatus.CREATED).body(EventMapper.toResponse(createdEvent, eventMemberRepository, donationRepository));
     }
     
     @PostMapping("/{eventId}/submit")
@@ -108,7 +110,7 @@ public class EventController {
         return ResponseEntity.ok(java.util.Map.of(
             "success", true,
             "message", "Event submitted for admin approval",
-            "event", EventMapper.toResponse(event, eventMemberRepository)
+            "event", EventMapper.toResponse(event, eventMemberRepository, donationRepository)
         ));
     }
     
@@ -146,13 +148,13 @@ public class EventController {
         }
         
         Event updatedEvent = eventService.update(eventId, eventData, user.getId());
-        return ResponseEntity.ok(EventMapper.toResponse(updatedEvent, eventMemberRepository));
+        return ResponseEntity.ok(EventMapper.toResponse(updatedEvent, eventMemberRepository, donationRepository));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<EventResponse> getEventById(@PathVariable Long id) {
         Event event = eventService.getById(id);
-        return ResponseEntity.ok(EventMapper.toResponse(event, eventMemberRepository));
+        return ResponseEntity.ok(EventMapper.toResponse(event, eventMemberRepository, donationRepository));
     }
 
     @GetMapping
@@ -167,7 +169,7 @@ public class EventController {
         
         Page<Event> eventPage = eventService.getPublicActiveEvents(pageable);
         List<EventResponse> responses = eventPage.getContent().stream()
-                .map(e -> EventMapper.toResponse(e, eventMemberRepository))
+                .map(e -> EventMapper.toResponse(e, eventMemberRepository, donationRepository))
                 .collect(Collectors.toList());
         
         Map<String, Object> response = new HashMap<>();
@@ -203,7 +205,7 @@ public class EventController {
         
         Page<Event> eventPage = eventService.getMyEvents(user.getId(), pageable);
         List<EventResponse> responses = eventPage.getContent().stream()
-                .map(e -> EventMapper.toResponse(e, eventMemberRepository))
+                .map(e -> EventMapper.toResponse(e, eventMemberRepository, donationRepository))
                 .collect(Collectors.toList());
         
         Map<String, Object> response = new HashMap<>();
@@ -280,6 +282,20 @@ public class EventController {
         comment.setContent(request.getContent());
         
         EventComment savedComment = eventCommentRepository.save(comment);
+
+        // Notify event owner (skip if owner commented on their own event)
+        if (event.getOwner() != null && !event.getOwner().getId().equals(user.getId())) {
+            notificationService.notify(
+                    event.getOwner().getId(),
+                    "New Comment on Your Campaign",
+                    user.getName() + " commented on \"" + event.getTitle() + "\"",
+                    "EVENT",
+                    "/events/" + eventId,
+                    eventId,
+                    "EVENT"
+            );
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED).body(EventCommentMapper.toResponse(savedComment));
     }
 

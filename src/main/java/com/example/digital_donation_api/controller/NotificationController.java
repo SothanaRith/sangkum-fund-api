@@ -135,7 +135,11 @@ public class NotificationController {
         NotificationResponse response = new NotificationResponse();
         response.setId(notification.getId());
         response.setType(notification.getType().name());
+        response.setTitle(notification.getTitle());
+        response.setMessage(notification.getMessage());
         response.setData(notification.getData());
+        response.setActionUrl(notification.getActionUrl());
+        response.setRelatedId(notification.getRelatedId());
         response.setIsRead(notification.getIsRead());
         response.setCreatedAt(notification.getCreatedAt().toString());
         return response;

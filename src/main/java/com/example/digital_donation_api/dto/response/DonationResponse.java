@@ -17,4 +17,7 @@ public class DonationResponse {
     private String transactionRef;
     private String status;
     private LocalDateTime createdAt;
+    private String donorName;
+    private Long eventId;
+    private String eventTitle;
 }

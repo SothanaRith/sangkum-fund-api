@@ -3,7 +3,9 @@ package com.example.digital_donation_api.dto.mapper;
 import com.example.digital_donation_api.dto.response.EventImageResponse;
 import com.example.digital_donation_api.dto.response.EventResponse;
 import com.example.digital_donation_api.entity.Event;
+import com.example.digital_donation_api.entity.DonationStatus;
 import com.example.digital_donation_api.repository.EventMemberRepository;
+import com.example.digital_donation_api.repository.DonationRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,10 +13,14 @@ import java.util.stream.Collectors;
 
 public class EventMapper {
     public static EventResponse toResponse(Event event) {
-        return toResponse(event, null);
+        return toResponse(event, null, null);
     }
     
     public static EventResponse toResponse(Event event, EventMemberRepository eventMemberRepository) {
+        return toResponse(event, eventMemberRepository, null);
+    }
+    
+    public static EventResponse toResponse(Event event, EventMemberRepository eventMemberRepository, DonationRepository donationRepository) {
         // Calculate progress percentage
         Double progressPercentage = 0.0;
         if (event.getGoalAmount() != null && event.getGoalAmount().compareTo(BigDecimal.ZERO) > 0) {
@@ -28,6 +34,12 @@ public class EventMapper {
         Integer participantCount = 0;
         if (eventMemberRepository != null) {
             participantCount = (int) eventMemberRepository.countByEventId(event.getId());
+        }
+
+        // Get actual donation/supporter count if repository is provided
+        Integer donationCount = 0;
+        if (donationRepository != null) {
+            donationCount = (int) donationRepository.countByEventIdAndStatus(event.getId(), DonationStatus.SUCCESS);
         }
         
         // Convert relative avatar URLs to absolute
@@ -68,7 +80,9 @@ public class EventMapper {
                 event.getCharity() != null ? event.getCharity().getId() : null,
                 event.getCharity() != null ? event.getCharity().getName() : null,
                 charityLogo,
-                0,
+                donationCount, // donationCount
+                donationCount, // donorsCount (for frontend)
+                donationCount, // donors (for frontend map)
                 participantCount,
                 progressPercentage,
                 images,
