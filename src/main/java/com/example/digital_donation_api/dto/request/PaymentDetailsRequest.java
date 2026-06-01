@@ -17,5 +17,6 @@ public class PaymentDetailsRequest {
     private String phoneNumber;
     
     // Common
+    @jakarta.validation.constraints.Size(max=200)
     private String notes;
 }

@@ -62,6 +62,12 @@ public class Event {
     
     private String location;
     
+    @Column(name = "khqr_image")
+    private String khqrImage;
+    
+    @Column(name = "bakong_account_id")
+    private String bakongAccountId;
+    
     private Double latitude;
     
     private Double longitude;

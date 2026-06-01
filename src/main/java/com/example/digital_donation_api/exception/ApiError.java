@@ -15,4 +15,14 @@ public class ApiError {
     private String message;
     private String path;
     private LocalDateTime timestamp;
+    private java.util.List<FieldErrorDTO> errors;
+
+    public ApiError(boolean success, int status, String error, String message, String path, LocalDateTime timestamp) {
+        this.success = success;
+        this.status = status;
+        this.error = error;
+        this.message = message;
+        this.path = path;
+        this.timestamp = timestamp;
+    }
 }

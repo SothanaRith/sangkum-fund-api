@@ -13,9 +13,9 @@ public interface AuthService {
     
     User registerWithOtp(String name, String email, String password, String otpCode);
     
-    String sendLoginOtp(String email);
-    
-    String sendRegistrationOtp(String email);
+    void sendLoginOtp(String email);
+
+    void sendRegistrationOtp(String email);
     
     TokenResponse refreshToken(String refreshToken);
     

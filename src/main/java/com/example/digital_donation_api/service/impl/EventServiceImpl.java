@@ -86,6 +86,12 @@ public class EventServiceImpl implements EventService {
         if (eventData.getCategory() != null) {
             event.setCategory(eventData.getCategory());
         }
+        if (eventData.getKhqrImage() != null) {
+            event.setKhqrImage(eventData.getKhqrImage());
+        }
+        if (eventData.getBakongAccountId() != null) {
+            event.setBakongAccountId(eventData.getBakongAccountId());
+        }
         
         // If event was rejected and now being updated, set back to PENDING for re-approval
         if (event.getStatus() == EventStatus.REJECTED) {

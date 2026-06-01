@@ -15,6 +15,7 @@ public class SettingsResponse {
     private PrivacySettings privacySettings;
     private NotificationSettings notificationSettings;
     private TelegramSettings telegramSettings;
+    private SecuritySettings securitySettings;
     
     @AllArgsConstructor
     @NoArgsConstructor
@@ -46,5 +47,15 @@ public class SettingsResponse {
         private Boolean connected;
         private String chatId;
         private String username;
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Getter
+    @Setter
+    public static class SecuritySettings {
+        private Boolean twoFactorEnabled;
+        private Boolean loginAlerts;
+        private Integer sessionTimeout;
     }
 }

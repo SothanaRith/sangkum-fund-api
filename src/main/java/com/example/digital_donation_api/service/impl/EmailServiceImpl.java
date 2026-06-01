@@ -3,7 +3,7 @@ package com.example.digital_donation_api.service.impl;
 import com.example.digital_donation_api.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -18,64 +18,53 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Value("${oauth2.frontend-url}")
+    private String frontendUrl;
+
+    @Value("${mail.from.address}")
+    private String fromAddress;
+
+    @Value("${mail.from.name}")
+    private String fromName;
+
     @Override
     public void sendOtpEmail(String to, String otp, String purpose) {
-        // In development mode, just log the OTP instead of sending email
-        log.info("==============================================");
-        log.info("OTP Email (Development Mode)");
-        log.info("To: {}", to);
-        log.info("Purpose: {}", purpose);
-        log.info("OTP Code: {}", otp);
-        log.info("==============================================");
-        
-        // Uncomment below for production with proper SMTP configuration
-        /*
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
+            helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             helper.setSubject("Your OTP Code - SangKumFund");
-            
+
             String htmlContent = buildOtpEmailContent(otp, purpose);
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("OTP email sent successfully to: {}", to);
-        } catch (MessagingException e) {
-            log.error("Failed to send OTP email to: {}", to, e);
-            throw new RuntimeException("Failed to send OTP email", e);
+            log.info("OTP email sent to: {}", to);
+        } catch (Exception e) {
+            log.warn("Email unavailable ({}), OTP for {} [{}]: {}", e.getMessage(), to, purpose, otp);
         }
-        */
     }
 
     @Override
     public void sendWelcomeEmail(String to, String name) {
-        // In development mode, just log instead of sending email
-        log.info("==============================================");
-        log.info("Welcome Email (Development Mode)");
-        log.info("To: {}", to);
-        log.info("Name: {}", name);
-        log.info("==============================================");
-        
-        // Uncomment below for production with proper SMTP configuration
-        /*
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
+            helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             helper.setSubject("Welcome to SangKumFund!");
-            
+
             String htmlContent = buildWelcomeEmailContent(name);
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("Welcome email sent successfully to: {}", to);
-        } catch (MessagingException e) {
-            log.error("Failed to send welcome email to: {}", to, e);
+            log.info("Welcome email sent to: {}", to);
+        } catch (Exception e) {
+            log.warn("Welcome email unavailable for {}: {}", to, e.getMessage());
         }
-        */
     }
 
     private String buildOtpEmailContent(String otp, String purpose) {
@@ -96,7 +85,7 @@ public class EmailServiceImpl implements EmailService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🎯 SangKumFund</h1>
+                        <h1>SangKumFund</h1>
                         <p>One-Time Password Verification</p>
                     </div>
                     <div class="content">
@@ -105,10 +94,10 @@ public class EmailServiceImpl implements EmailService {
                         <div class="otp-box">
                             <div class="otp-code">%s</div>
                         </div>
-                        <p><strong>⚠️ This code will expire in 5 minutes.</strong></p>
+                        <p><strong>This code will expire in 5 minutes.</strong></p>
                         <p>If you didn't request this code, please ignore this email.</p>
                         <div class="footer">
-                            <p>© 2026 SangKumFund. All rights reserved.</p>
+                            <p>&copy; 2026 SangKumFund. All rights reserved.</p>
                             <p>Making a difference, one donation at a time.</p>
                         </div>
                     </div>
@@ -135,29 +124,29 @@ public class EmailServiceImpl implements EmailService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🎉 Welcome to SangKumFund!</h1>
+                        <h1>Welcome to SangKumFund!</h1>
                     </div>
                     <div class="content">
                         <h2>Hello %s!</h2>
                         <p>Thank you for joining SangKumFund - where every donation makes a difference.</p>
                         <p>Your account has been successfully created and verified. You can now:</p>
                         <ul>
-                            <li>✅ Create and manage fundraising events</li>
-                            <li>✅ Support charitable causes</li>
-                            <li>✅ Track your donation impact</li>
-                            <li>✅ Connect with a community of givers</li>
+                            <li>Create and manage fundraising events</li>
+                            <li>Support charitable causes</li>
+                            <li>Track your donation impact</li>
+                            <li>Connect with a community of givers</li>
                         </ul>
                         <p style="text-align: center;">
-                            <a href="http://localhost:3000" class="button">Get Started</a>
+                            <a href="%s" class="button">Get Started</a>
                         </p>
                         <div class="footer">
-                            <p>© 2026 SangKumFund. All rights reserved.</p>
+                            <p>&copy; 2026 SangKumFund. All rights reserved.</p>
                             <p>Making a difference, one donation at a time.</p>
                         </div>
                     </div>
                 </div>
             </body>
             </html>
-            """.formatted(name);
+            """.formatted(name, frontendUrl);
     }
 }

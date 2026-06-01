@@ -126,7 +126,7 @@ public class AdminBlogController {
     
     // 6. Create new article
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createArticle(@RequestBody Post article) {
+    public ResponseEntity<Map<String, Object>> createArticle(@jakarta.validation.Valid @RequestBody Post article) {
         try {
             if (article.getTitle() == null || article.getTitle().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -161,7 +161,7 @@ public class AdminBlogController {
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, Object>> updateArticle(
         @PathVariable Long id,
-        @RequestBody Post articleUpdate
+        @jakarta.validation.Valid @RequestBody Post articleUpdate
     ) {
         try {
             Post article = postRepository.findById(id)

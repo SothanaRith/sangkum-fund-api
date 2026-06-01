@@ -121,6 +121,7 @@ public class CharityController {
         return ResponseEntity.ok(response);
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = "charities", key = "#id")
     @GetMapping("/{id}")
     public ResponseEntity<CharityResponse> getCharityById(@PathVariable Long id) {
         Charity charity = charityService.getById(id);
@@ -134,11 +135,13 @@ public class CharityController {
     }
 
     @GetMapping("/{charityId}/announcements")
-    public ResponseEntity<List<AnnouncementResponse>> getCharityAnnouncements(@PathVariable Long charityId) {
+    public ResponseEntity<List<AnnouncementResponse>> getCharityAnnouncements(
+            @PathVariable Long charityId
+    ) {
         List<Announcement> announcements = announcementRepository.findByCharityIdOrderByCreatedAtDesc(charityId);
         List<AnnouncementResponse> responses = announcements.stream()
                 .map(AnnouncementMapper::toResponse)
-                .collect(Collectors.toList());
+                .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(responses);
     }
 }

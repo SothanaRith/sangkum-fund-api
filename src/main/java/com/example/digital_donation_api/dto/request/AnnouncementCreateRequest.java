@@ -8,9 +8,11 @@ import lombok.Setter;
 public class AnnouncementCreateRequest {
 
     @NotBlank
+    @jakarta.validation.constraints.NotBlank
     private String title;
 
     @NotBlank
+    @jakarta.validation.constraints.NotBlank
     private String content;
 
     private Long eventId;

@@ -8,8 +8,10 @@ import lombok.Setter;
 public class CharityCreateRequest {
 
     @NotBlank
+    @jakarta.validation.constraints.NotBlank
     private String name;
 
+    @jakarta.validation.constraints.NotBlank
     private String description;
     
     private String logo;

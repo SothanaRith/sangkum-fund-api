@@ -18,11 +18,4 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final AdminService adminService;
-
-    @PostMapping("/charities/{charityId}/verify")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> verifyCharity(@PathVariable Long charityId) {
-        adminService.verifyCharity(charityId);
-        return ResponseEntity.ok("Charity verified successfully");
-    }
 }

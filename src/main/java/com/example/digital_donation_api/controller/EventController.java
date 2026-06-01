@@ -17,6 +17,7 @@ import com.example.digital_donation_api.entity.Announcement;
 import com.example.digital_donation_api.entity.Donation;
 import com.example.digital_donation_api.entity.Event;
 import com.example.digital_donation_api.entity.EventComment;
+import com.example.digital_donation_api.entity.EventMessage;
 import com.example.digital_donation_api.entity.EventTimeline;
 import com.example.digital_donation_api.entity.EventVisibility;
 import com.example.digital_donation_api.entity.User;
@@ -24,6 +25,10 @@ import com.example.digital_donation_api.repository.AnnouncementRepository;
 import com.example.digital_donation_api.repository.DonationRepository;
 import com.example.digital_donation_api.repository.EventCommentRepository;
 import com.example.digital_donation_api.repository.EventMemberRepository;
+import com.example.digital_donation_api.repository.EventMessageRepository;
+import com.example.digital_donation_api.repository.AnnouncementReactionRepository;
+import com.example.digital_donation_api.repository.AnnouncementCommentRepository;
+import com.example.digital_donation_api.repository.AnnouncementCommentReactionRepository;
 import com.example.digital_donation_api.repository.EventTimelineRepository;
 import com.example.digital_donation_api.service.EventService;
 import jakarta.validation.Valid;
@@ -53,8 +58,13 @@ public class EventController {
     private final AnnouncementRepository announcementRepository;
     private final EventCommentRepository eventCommentRepository;
     private final DonationRepository donationRepository;
+    private final EventMessageRepository eventMessageRepository;
+    private final AnnouncementReactionRepository announcementReactionRepository;
+    private final AnnouncementCommentRepository announcementCommentRepository;
+    private final AnnouncementCommentReactionRepository announcementCommentReactionRepository;
 
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<EventResponse> createEvent(
             @Valid @RequestBody EventCreateRequest request,
             Authentication authentication
@@ -72,6 +82,8 @@ public class EventController {
         event.setLatitude(request.getLatitude());
         event.setLongitude(request.getLongitude());
         event.setCategory(request.getCategory());
+        event.setKhqrImage(request.getKhqrImage());
+        event.setBakongAccountId(request.getBakongAccountId());
         
         // Set visibility with default PUBLIC
         if (request.getVisibility() != null && request.getVisibility().equalsIgnoreCase("PRIVATE")) {
@@ -85,6 +97,7 @@ public class EventController {
     }
     
     @PostMapping("/{eventId}/submit")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> submitForApproval(
             @PathVariable Long eventId,
             Authentication authentication
@@ -100,6 +113,7 @@ public class EventController {
     }
     
     @PutMapping("/{eventId}")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<EventResponse> updateEvent(
             @PathVariable Long eventId,
             @Valid @RequestBody EventCreateRequest request,
@@ -121,6 +135,8 @@ public class EventController {
         eventData.setStartDate(request.getStartDate());
         eventData.setEndDate(request.getEndDate());
         eventData.setImageUrl(request.getImageUrl());
+        eventData.setKhqrImage(request.getKhqrImage());
+        eventData.setBakongAccountId(request.getBakongAccountId());
         
         // Set visibility
         if (request.getVisibility() != null && request.getVisibility().equalsIgnoreCase("PRIVATE")) {
@@ -176,6 +192,7 @@ public class EventController {
     }
     
     @GetMapping("/my-events")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getMyEvents(
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
@@ -199,6 +216,7 @@ public class EventController {
     }
 
     @PostMapping("/{eventId}/join")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> joinEvent(
             @PathVariable Long eventId,
             Authentication authentication
@@ -232,7 +250,7 @@ public class EventController {
     public ResponseEntity<List<AnnouncementResponse>> getEventAnnouncements(@PathVariable Long eventId) {
         List<Announcement> announcements = announcementRepository.findByEventIdOrderByCreatedAtDesc(eventId);
         List<AnnouncementResponse> responses = announcements.stream()
-                .map(AnnouncementMapper::toResponse)
+                .map(a -> AnnouncementMapper.toResponse(a, announcementCommentRepository, announcementReactionRepository, announcementCommentReactionRepository))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -247,6 +265,7 @@ public class EventController {
     }
 
     @PostMapping("/{eventId}/comments")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<EventCommentResponse> createComment(
             @PathVariable Long eventId,
             @Valid @RequestBody EventCommentCreateRequest request,
@@ -262,5 +281,126 @@ public class EventController {
         
         EventComment savedComment = eventCommentRepository.save(comment);
         return ResponseEntity.status(HttpStatus.CREATED).body(EventCommentMapper.toResponse(savedComment));
+    }
+
+    // ── View tracking ─────────────────────────────────────────────────────────
+
+    @PostMapping("/{eventId}/view")
+    public ResponseEntity<Map<String, Object>> recordView(@PathVariable Long eventId) {
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PostMapping("/{eventId}/view/anonymous")
+    public ResponseEntity<Map<String, Object>> recordAnonymousView(@PathVariable Long eventId) {
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    // ── Event messages (chat) ─────────────────────────────────────────────────
+
+    @PostMapping("/{eventId}/messages")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> sendMessage(
+            @PathVariable Long eventId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication
+    ) {
+        String text = body.get("message");
+        if (text == null || text.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Message cannot be empty"));
+        }
+        User user = (User) authentication.getPrincipal();
+        Event event = eventService.getById(eventId);
+
+        EventMessage msg = new EventMessage();
+        msg.setEvent(event);
+        msg.setUser(user);
+        msg.setMessage(text.trim());
+        EventMessage saved = eventMessageRepository.save(msg);
+
+        boolean isOwner = event.getOwner() != null && event.getOwner().getId().equals(user.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(toMessageMap(saved, isOwner));
+    }
+
+    @GetMapping("/{eventId}/messages")
+    public ResponseEntity<Map<String, Object>> getMessages(
+            @PathVariable Long eventId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").ascending());
+        Page<EventMessage> messagePage = eventMessageRepository.findByEventIdOrderByCreatedAtAsc(eventId, pageable);
+
+        Event event = eventService.getById(eventId);
+        List<Map<String, Object>> content = messagePage.getContent().stream()
+                .map(m -> {
+                    boolean isOwner = event.getOwner() != null && event.getOwner().getId().equals(m.getUser().getId());
+                    return toMessageMap(m, isOwner);
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+                "content", content,
+                "totalElements", messagePage.getTotalElements(),
+                "totalPages", messagePage.getTotalPages(),
+                "currentPage", messagePage.getNumber()
+        ));
+    }
+
+    @GetMapping("/{eventId}/messages/recent")
+    public ResponseEntity<List<Map<String, Object>>> getRecentMessages(
+            @PathVariable Long eventId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        Pageable pageable = PageRequest.of(0, limit, Sort.by("createdAt").ascending());
+        Event event = eventService.getById(eventId);
+        List<Map<String, Object>> messages = eventMessageRepository
+                .findByEventIdOrderByCreatedAtAsc(eventId, pageable)
+                .getContent().stream()
+                .map(m -> {
+                    boolean isOwner = event.getOwner() != null && event.getOwner().getId().equals(m.getUser().getId());
+                    return toMessageMap(m, isOwner);
+                })
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(messages);
+    }
+
+    @GetMapping("/{eventId}/messages/count")
+    public ResponseEntity<Map<String, Object>> getMessageCount(@PathVariable Long eventId) {
+        long count = eventMessageRepository.countByEventId(eventId);
+        return ResponseEntity.ok(Map.of("count", count));
+    }
+
+    @DeleteMapping("/{eventId}/messages/{messageId}")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> deleteMessage(
+            @PathVariable Long eventId,
+            @PathVariable Long messageId,
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        EventMessage msg = eventMessageRepository.findById(messageId)
+                .orElseThrow(() -> new com.example.digital_donation_api.exception.ResourceNotFoundException("Message not found"));
+
+        Event event = eventService.getById(eventId);
+        boolean isOwner = event.getOwner() != null && event.getOwner().getId().equals(user.getId());
+        boolean isAuthor = msg.getUser().getId().equals(user.getId());
+
+        if (!isAuthor && !isOwner) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", "Not allowed"));
+        }
+        eventMessageRepository.delete(msg);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    private Map<String, Object> toMessageMap(EventMessage msg, boolean isOwner) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", msg.getId());
+        m.put("userId", msg.getUser().getId());
+        m.put("userName", msg.getUser().getName());
+        m.put("userAvatar", msg.getUser().getAvatar());
+        m.put("message", msg.getMessage());
+        m.put("isOwner", isOwner);
+        m.put("createdAt", msg.getCreatedAt());
+        return m;
     }
 }

@@ -9,25 +9,29 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+import jakarta.persistence.EntityNotFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(ResourceNotFoundException.class)
+    @ExceptionHandler({ResourceNotFoundException.class, EntityNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(
-            ResourceNotFoundException ex,
+            Exception ex,
             HttpServletRequest request
     ) {
         return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(BadRequestException.class)
+    @ExceptionHandler({BadRequestException.class, ValidationException.class})
     public ResponseEntity<ApiError> handleBadRequest(
-            BadRequestException ex,
+            Exception ex,
             HttpServletRequest request
     ) {
         return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
@@ -70,14 +74,31 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
-        String message = ex.getBindingResult()
+        List<FieldErrorDTO> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(e -> e.getField() + ": " + e.getDefaultMessage())
-                .findFirst()
-                .orElse("Validation error");
+                .map(e -> new FieldErrorDTO(e.getField(), e.getDefaultMessage()))
+                .collect(Collectors.toList());
 
-        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, message, request);
+        ApiError error = new ApiError(
+                false,
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+                "Validation error",
+                request.getRequestURI(),
+                LocalDateTime.now(),
+                errors
+        );
+        return new ResponseEntity<>(error, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+        String message = String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName());
+        return buildError(HttpStatus.BAD_REQUEST, message, request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -99,15 +120,9 @@ public class GlobalExceptionHandler {
     ) {
         log.error("Unexpected error occurred: ", ex);
         
-        // Include exception details in development
-        String message = "Unexpected server error";
-        if (ex.getMessage() != null && !ex.getMessage().isEmpty()) {
-            message = ex.getMessage();
-        }
-        
         return buildError(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                message,
+                "Unexpected server error: " + ex.getClass().getName() + " - " + ex.getMessage(),
                 request
         );
     }
@@ -123,7 +138,8 @@ public class GlobalExceptionHandler {
                 status.getReasonPhrase(),
                 message,
                 request.getRequestURI(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                null
         );
         return new ResponseEntity<>(error, status);
     }

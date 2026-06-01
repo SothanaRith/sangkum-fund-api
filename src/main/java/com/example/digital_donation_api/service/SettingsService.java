@@ -7,7 +7,7 @@ import com.example.digital_donation_api.dto.response.SettingsResponse.PrivacySet
 public interface SettingsService {
     SettingsResponse getSettings(Long userId);
     
-    SettingsResponse updateSettings(Long userId, PrivacySettings privacySettings, NotificationSettings notificationSettings);
+    SettingsResponse updateSettings(Long userId, PrivacySettings privacySettings, NotificationSettings notificationSettings, com.example.digital_donation_api.dto.response.SettingsResponse.SecuritySettings securitySettings);
     
     SettingsResponse connectTelegram(Long userId, String chatId, String username);
     

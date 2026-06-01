@@ -4,6 +4,7 @@ import com.example.digital_donation_api.dto.mapper.PaymentProofMapper;
 import com.example.digital_donation_api.dto.request.PaymentProofRequest;
 import com.example.digital_donation_api.dto.response.PaymentProofResponse;
 import com.example.digital_donation_api.entity.PaymentProof;
+import com.example.digital_donation_api.entity.User;
 import com.example.digital_donation_api.service.PaymentProofService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,9 +71,7 @@ public class PaymentProofController {
             @RequestParam(required = false) String notes,
             Authentication authentication
     ) {
-        // TODO: Get actual admin ID from authentication
-        Long adminId = 1L;
-        
+        Long adminId = ((User) authentication.getPrincipal()).getId();
         PaymentProof proof = paymentProofService.approveProof(id, adminId, notes);
         return ResponseEntity.ok(PaymentProofMapper.toResponse(proof));
     }
@@ -84,9 +83,7 @@ public class PaymentProofController {
             @RequestParam(required = false) String notes,
             Authentication authentication
     ) {
-        // TODO: Get actual admin ID from authentication
-        Long adminId = 1L;
-        
+        Long adminId = ((User) authentication.getPrincipal()).getId();
         PaymentProof proof = paymentProofService.rejectProof(id, adminId, notes);
         return ResponseEntity.ok(PaymentProofMapper.toResponse(proof));
     }

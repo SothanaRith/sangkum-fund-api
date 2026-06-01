@@ -24,6 +24,10 @@ public class AnnouncementComment {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @ManyToOne
+    @JoinColumn(name = "parent_id")
+    private AnnouncementComment parent;
+
     @Column(columnDefinition = "TEXT")
     private String content;
 

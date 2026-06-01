@@ -23,25 +23,23 @@ public class OtpServiceImpl implements OtpService {
 
     private final OtpCodeRepository otpCodeRepository;
     private final EmailService emailService;
-    
+
     @Value("${otp.expiration-minutes:5}")
     private int otpExpirationMinutes;
-    
+
     @Value("${otp.max-attempts:3}")
     private int maxAttempts;
-    
+
     private static final SecureRandom random = new SecureRandom();
 
     @Override
     @Transactional
-    public String generateAndSendOtp(String email, OtpType type) {
-        // Delete any existing unverified OTPs for this email and type
+    public void generateAndSendOtp(String email, OtpType type) {
+        // Invalidate any existing unverified OTP for this email+type
         otpCodeRepository.deleteUnverifiedOtpsByEmailAndType(email, type);
-        
-        // Generate 6-digit OTP
+
         String code = String.format("%06d", random.nextInt(1000000));
-        
-        // Create and save OTP
+
         OtpCode otpCode = OtpCode.builder()
                 .email(email)
                 .code(code)
@@ -50,63 +48,58 @@ public class OtpServiceImpl implements OtpService {
                 .verified(false)
                 .attempts(0)
                 .build();
-        
+
         otpCodeRepository.save(otpCode);
-        
-        // Send email
+
         String purpose = switch (type) {
-            case REGISTRATION -> "Registration";
-            case LOGIN -> "Login";
+            case REGISTRATION  -> "Registration";
+            case LOGIN         -> "Login";
             case PASSWORD_RESET -> "Password Reset";
         };
-        
+
         emailService.sendOtpEmail(email, code, purpose);
-        
-        log.info("OTP generated and sent for email: {} and type: {}", email, type);
-        return code; // In production, don't return the code
+        log.info("OTP sent for email: {} type: {}", email, type);
     }
 
     @Override
     @Transactional
     public boolean verifyOtp(String email, String code, OtpType type) {
+        // Look up by email+type only — this way wrong-code attempts still count
         Optional<OtpCode> otpCodeOpt = otpCodeRepository
-                .findByEmailAndCodeAndTypeAndVerifiedFalse(email, code, type);
-        
+                .findFirstByEmailAndTypeAndVerifiedFalseOrderByCreatedAtDesc(email, type);
+
         if (otpCodeOpt.isEmpty()) {
-            log.warn("OTP verification failed - OTP not found for email: {}", email);
+            log.warn("OTP not found for email: {} type: {}", email, type);
             return false;
         }
-        
+
         OtpCode otpCode = otpCodeOpt.get();
-        
-        // Check if expired
+
         if (otpCode.isExpired()) {
-            log.warn("OTP verification failed - OTP expired for email: {}", email);
+            log.warn("OTP expired for email: {}", email);
             throw new BadRequestException("OTP has expired. Please request a new one.");
         }
-        
-        // Check attempts
-        if (otpCode.getAttempts() >= maxAttempts) {
-            log.warn("OTP verification failed - Max attempts reached for email: {}", email);
-            throw new BadRequestException("Maximum verification attempts exceeded. Please request a new OTP.");
-        }
-        
-        // Increment attempts
+
+        // Increment attempts BEFORE checking the code so every wrong guess counts
         otpCode.setAttempts(otpCode.getAttempts() + 1);
-        
-        // Verify code
+
+        if (otpCode.getAttempts() > maxAttempts) {
+            otpCodeRepository.save(otpCode);
+            log.warn("Max OTP attempts exceeded for email: {}", email);
+            throw new BadRequestException("Maximum attempts exceeded. Please request a new OTP.");
+        }
+
         if (!otpCode.getCode().equals(code)) {
             otpCodeRepository.save(otpCode);
-            log.warn("OTP verification failed - Invalid code for email: {}", email);
+            log.warn("Wrong OTP code for email: {} (attempt {}/{})", email, otpCode.getAttempts(), maxAttempts);
             return false;
         }
-        
-        // Mark as verified
+
         otpCode.setVerified(true);
         otpCode.setVerifiedAt(LocalDateTime.now());
         otpCodeRepository.save(otpCode);
-        
-        log.info("OTP verified successfully for email: {} and type: {}", email, type);
+
+        log.info("OTP verified for email: {} type: {}", email, type);
         return true;
     }
 
@@ -114,6 +107,6 @@ public class OtpServiceImpl implements OtpService {
     @Transactional
     public void cleanupExpiredOtps() {
         otpCodeRepository.deleteExpiredOtps(LocalDateTime.now());
-        log.info("Expired OTPs cleaned up");
+        log.info("Expired OTPs cleaned up.");
     }
 }

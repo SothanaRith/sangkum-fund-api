@@ -28,6 +28,7 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
@@ -37,12 +38,15 @@ public class User implements UserDetails {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @JsonIgnore
     @Column(name = "failed_login_attempts")
     private Integer failedLoginAttempts = 0;
 
+    @JsonIgnore
     @Column(name = "account_locked")
     private Boolean accountLocked = false;
 
+    @JsonIgnore
     @Column(name = "lock_time")
     private LocalDateTime lockTime;
     
@@ -90,6 +94,11 @@ public class User implements UserDetails {
         return userRoles.stream()
                 .map(userRole -> (GrantedAuthority) () -> "ROLE_" + userRole.getRole().getName())
                 .toList();
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
     }
 
     @Override

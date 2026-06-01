@@ -218,13 +218,16 @@ public class AdminEventController {
      * Get event by status
      */
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<EventResponse>> getEventsByStatus(@PathVariable String status) {
+    public ResponseEntity<Page<EventResponse>> getEventsByStatus(
+            @PathVariable String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
         EventStatus eventStatus = EventStatus.valueOf(status.toUpperCase());
-        List<Event> events = eventRepository.findByStatus(eventStatus);
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<Event> events = eventRepository.findByStatus(eventStatus, pageable);
         
-        List<EventResponse> responses = events.stream()
-                .map(e -> EventMapper.toResponse(e, eventMemberRepository))
-                .collect(Collectors.toList());
+        Page<EventResponse> responses = events.map(e -> EventMapper.toResponse(e, eventMemberRepository));
         
         return ResponseEntity.ok(responses);
     }
@@ -233,17 +236,15 @@ public class AdminEventController {
      * Search events by title
      */
     @GetMapping("/search")
-    public ResponseEntity<List<EventResponse>> searchEvents(@RequestParam String query) {
-        String searchQuery = "%" + query.toLowerCase() + "%";
-        List<Event> events = eventRepository.findAll().stream()
-                .filter(e -> e.getTitle().toLowerCase().contains(query.toLowerCase()) ||
-                        (e.getDescription() != null && 
-                         e.getDescription().toLowerCase().contains(query.toLowerCase())))
-                .collect(Collectors.toList());
+    public ResponseEntity<Page<EventResponse>> searchEvents(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<Event> events = eventRepository.searchEvents(query, pageable);
         
-        List<EventResponse> responses = events.stream()
-                .map(e -> EventMapper.toResponse(e, eventMemberRepository))
-                .collect(Collectors.toList());
+        Page<EventResponse> responses = events.map(e -> EventMapper.toResponse(e, eventMemberRepository));
         
         return ResponseEntity.ok(responses);
     }

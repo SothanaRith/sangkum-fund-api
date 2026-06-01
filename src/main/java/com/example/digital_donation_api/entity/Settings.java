@@ -23,4 +23,7 @@ public class Settings {
 
     @Column(columnDefinition = "JSON")
     private String notificationSettings;
+
+    @Column(columnDefinition = "JSON")
+    private String securitySettings;
 }

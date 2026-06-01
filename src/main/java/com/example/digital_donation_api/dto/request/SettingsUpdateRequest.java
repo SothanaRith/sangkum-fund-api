@@ -8,6 +8,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class SettingsUpdateRequest {
+    @jakarta.validation.constraints.NotNull
     private PrivacySettings privacySettings;
     private NotificationSettings notificationSettings;
+    private com.example.digital_donation_api.dto.response.SettingsResponse.SecuritySettings securitySettings;
 }

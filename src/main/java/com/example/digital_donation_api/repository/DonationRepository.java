@@ -5,6 +5,7 @@ import com.example.digital_donation_api.entity.DonationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,12 +18,18 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
 
     List<Donation> findByEventId(Long eventId);
 
+    boolean existsByTransactionRef(String transactionRef);
+
+    java.util.Optional<Donation> findByTransactionRef(String transactionRef);
+
     List<Donation> findTop5ByEventIdOrderByCreatedAtDesc(Long eventId);
 
     List<Donation> findByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"event", "user"})
     Page<Donation> findByUserId(Long userId, Pageable pageable);
     
+    @EntityGraph(attributePaths = {"event", "user"})
     Page<Donation> findByStatus(DonationStatus status, Pageable pageable);
     
     long countByStatus(DonationStatus status);
@@ -38,6 +45,7 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
         OR LOWER(d.transactionRef) LIKE LOWER(CONCAT('%', :search, '%')))
         ORDER BY d.createdAt DESC
     """)
+    @EntityGraph(attributePaths = {"event", "user"})
     Page<Donation> findByStatusAndSearch(
             @Param("status") DonationStatus status,
             @Param("search") String search,
@@ -51,6 +59,7 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
         OR LOWER(d.transactionRef) LIKE LOWER(CONCAT('%', :search, '%'))
         ORDER BY d.createdAt DESC
     """)
+    @EntityGraph(attributePaths = {"event", "user"})
     Page<Donation> findBySearch(@Param("search") String search, Pageable pageable);
 
     @Query("""

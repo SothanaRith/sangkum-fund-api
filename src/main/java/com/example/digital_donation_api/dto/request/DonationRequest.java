@@ -14,6 +14,7 @@ public class DonationRequest {
     private Long eventId;
 
     @NotNull
+    @jakarta.validation.constraints.Min(1)
     private BigDecimal amount;
 
     private Boolean anonymous = false;

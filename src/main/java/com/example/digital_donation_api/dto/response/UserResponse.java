@@ -12,4 +12,8 @@ public class UserResponse {
     private String avatar;
     private String phone;
     private Boolean active;
+    private java.time.LocalDateTime createdAt;
+    private java.time.LocalDateTime lastLoginAt;
+    private Boolean isBlocked;
+    private String role;
 }

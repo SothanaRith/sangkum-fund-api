@@ -47,8 +47,16 @@ public class OAuth2ServiceImpl implements OAuth2Service {
                 .orElseGet(() -> createOAuth2User(email, name, picture, registrationId));
         
         // Update avatar if available and not set
+        boolean shouldSave = false;
         if (picture != null && (user.getAvatar() == null || user.getAvatar().isEmpty())) {
             user.setAvatar(picture);
+            shouldSave = true;
+        }
+        
+        user.setLastLoginAt(java.time.LocalDateTime.now());
+        shouldSave = true;
+        
+        if (shouldSave) {
             userRepository.save(user);
         }
         

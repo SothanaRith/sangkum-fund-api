@@ -4,6 +4,7 @@ import com.example.digital_donation_api.dto.response.SettingsResponse;
 import com.example.digital_donation_api.dto.response.SettingsResponse.NotificationSettings;
 import com.example.digital_donation_api.dto.response.SettingsResponse.PrivacySettings;
 import com.example.digital_donation_api.dto.response.SettingsResponse.TelegramSettings;
+import com.example.digital_donation_api.dto.response.SettingsResponse.SecuritySettings;
 import com.example.digital_donation_api.entity.Settings;
 import com.example.digital_donation_api.entity.User;
 import com.example.digital_donation_api.exception.ResourceNotFoundException;
@@ -34,7 +35,7 @@ public class SettingsServiceImpl implements SettingsService {
     }
 
     @Override
-    public SettingsResponse updateSettings(Long userId, PrivacySettings privacySettings, NotificationSettings notificationSettings) {
+    public SettingsResponse updateSettings(Long userId, PrivacySettings privacySettings, NotificationSettings notificationSettings, SecuritySettings securitySettings) {
         Settings settings = settingsRepository.findByUserId(userId)
                 .orElseGet(() -> createDefaultSettings(userId));
         
@@ -44,6 +45,9 @@ public class SettingsServiceImpl implements SettingsService {
             }
             if (notificationSettings != null) {
                 settings.setNotificationSettings(objectMapper.writeValueAsString(notificationSettings));
+            }
+            if (securitySettings != null) {
+                settings.setSecuritySettings(objectMapper.writeValueAsString(securitySettings));
             }
             
             settings = settingsRepository.save(settings);
@@ -107,9 +111,11 @@ public class SettingsServiceImpl implements SettingsService {
         try {
             PrivacySettings defaultPrivacy = new PrivacySettings(true, true, false);
             NotificationSettings defaultNotifications = new NotificationSettings(true, true, true, true, false);
+            SecuritySettings defaultSecurity = new SecuritySettings(false, true, 60);
             
             settings.setPrivacySettings(objectMapper.writeValueAsString(defaultPrivacy));
             settings.setNotificationSettings(objectMapper.writeValueAsString(defaultNotifications));
+            settings.setSecuritySettings(objectMapper.writeValueAsString(defaultSecurity));
             
             return settingsRepository.save(settings);
         } catch (JsonProcessingException e) {
@@ -125,13 +131,15 @@ public class SettingsServiceImpl implements SettingsService {
             null,
             null
         );
+        SecuritySettings securitySettings = parseSecuritySettings(settings.getSecuritySettings());
         
         return new SettingsResponse(
             settings.getId(),
             settings.getUser().getId(),
             privacySettings,
             notificationSettings,
-            telegramSettings
+            telegramSettings,
+            securitySettings
         );
     }
 
@@ -154,6 +162,17 @@ public class SettingsServiceImpl implements SettingsService {
             return objectMapper.readValue(json, NotificationSettings.class);
         } catch (JsonProcessingException e) {
             return new NotificationSettings(true, true, true, true, false);
+        }
+    }
+
+    private SecuritySettings parseSecuritySettings(String json) {
+        if (json == null || json.isEmpty()) {
+            return new SecuritySettings(false, true, 60);
+        }
+        try {
+            return objectMapper.readValue(json, SecuritySettings.class);
+        } catch (JsonProcessingException e) {
+            return new SecuritySettings(false, true, 60);
         }
     }
 }

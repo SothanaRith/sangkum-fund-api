@@ -34,4 +34,6 @@ public class EventResponse {
     private Double latitude;
     private Double longitude;
     private String category;
+    private String khqrImage;
+    private String bakongAccountId;
 }

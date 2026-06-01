@@ -11,13 +11,20 @@ public class UserMapper {
             avatar = "http://localhost:8080" + avatar;
         }
         
+        String role = user.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")) ? "ADMIN" : "USER";
+
         return new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 avatar,
                 user.getPhone(),
-                user.getIsActive()
+                user.getIsActive(),
+                user.getCreatedAt(),
+                user.getLastLoginAt(),
+                user.getIsBlocked(),
+                role
         );
     }
 }

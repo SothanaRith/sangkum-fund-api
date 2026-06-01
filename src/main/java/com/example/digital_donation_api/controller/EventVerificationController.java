@@ -1,6 +1,7 @@
 package com.example.digital_donation_api.controller;
 
 import com.example.digital_donation_api.entity.Event;
+import com.example.digital_donation_api.entity.User;
 import com.example.digital_donation_api.service.EventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,17 +31,16 @@ public class EventVerificationController {
     public ResponseEntity<Map<String, Object>> approveEvent(
             @PathVariable Long eventId,
             Authentication authentication) {
-        
-        Long adminId = ((org.springframework.security.core.userdetails.User) authentication.getPrincipal())
-                .getUsername() != null ? 1L : 1L; // TODO: Get actual user ID from authentication
-        
+
+        Long adminId = ((User) authentication.getPrincipal()).getId();
+
         Event event = eventService.approveEvent(eventId, adminId);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Event approved successfully");
         response.put("event", event);
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -49,7 +49,7 @@ public class EventVerificationController {
             @PathVariable Long eventId,
             @RequestBody Map<String, String> request,
             Authentication authentication) {
-        
+
         String reason = request.get("reason");
         if (reason == null || reason.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -57,30 +57,30 @@ public class EventVerificationController {
                 "message", "Rejection reason is required"
             ));
         }
-        
-        Long adminId = 1L; // TODO: Get actual user ID from authentication
-        
+
+        Long adminId = ((User) authentication.getPrincipal()).getId();
+
         Event event = eventService.rejectEvent(eventId, adminId, reason);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Event rejected");
         response.put("event", event);
-        
+
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{eventId}/status")
     public ResponseEntity<Map<String, Object>> getEventStatus(@PathVariable Long eventId) {
         Event event = eventService.getById(eventId);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("eventId", event.getId());
         response.put("title", event.getTitle());
         response.put("status", event.getStatus());
         response.put("rejectionReason", event.getRejectionReason());
         response.put("reviewedAt", event.getReviewedAt());
-        
+
         return ResponseEntity.ok(response);
     }
 }

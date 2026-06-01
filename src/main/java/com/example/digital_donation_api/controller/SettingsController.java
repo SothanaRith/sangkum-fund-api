@@ -27,14 +27,15 @@ public class SettingsController {
 
     @PutMapping
     public ResponseEntity<SettingsResponse> updateSettings(
-            @RequestBody SettingsUpdateRequest request,
+            @jakarta.validation.Valid @RequestBody SettingsUpdateRequest request,
             Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();
         SettingsResponse settings = settingsService.updateSettings(
                 user.getId(),
                 request.getPrivacySettings(),
-                request.getNotificationSettings()
+                request.getNotificationSettings(),
+                request.getSecuritySettings()
         );
         return ResponseEntity.ok(settings);
     }

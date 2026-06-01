@@ -2,6 +2,7 @@ package com.example.digital_donation_api.service.impl;
 
 import com.example.digital_donation_api.config.JwtConfig;
 import com.example.digital_donation_api.dto.response.TokenResponse;
+import com.example.digital_donation_api.dto.mapper.UserMapper;
 import com.example.digital_donation_api.entity.OtpType;
 import com.example.digital_donation_api.entity.RefreshToken;
 import com.example.digital_donation_api.entity.Role;
@@ -41,180 +42,78 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final AccountLockService accountLockService;
 
+    // ── Login (password only) ─────────────────────────────────────────────────
+
     @Override
     public TokenResponse login(String email, String password) {
         try {
-            log.debug("Login attempt for email: {}", email);
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
-            // Check if user is blocked
-            if (user.getIsBlocked()) {
-                throw new UnauthorizedException(
-                    "Your account has been blocked. Reason: " + user.getBlockReason()
-                );
-            }
+            checkNotBlocked(user);
+            checkNotLocked(user);
 
-            // Check if account is locked
-            if (accountLockService.isAccountLocked(user)) {
-                throw new UnauthorizedException(
-                    "Account is locked due to multiple failed login attempts. Please try again later or contact support."
-                );
-            }
-
-            log.debug("User found: {}, checking password", user.getEmail());
             if (!passwordEncoder.matches(password, user.getPassword())) {
-                // Increment failed attempts
                 accountLockService.incrementFailedAttempts(user);
-                int remainingAttempts = accountLockService.getRemainingAttempts(user);
-                
-                if (remainingAttempts > 0) {
+                int remaining = accountLockService.getRemainingAttempts(user);
+                if (remaining > 0) {
                     throw new UnauthorizedException(
-                        "Invalid credentials. You have " + remainingAttempts + " attempt(s) remaining."
-                    );
-                } else {
-                    throw new UnauthorizedException(
-                        "Account has been locked due to too many failed login attempts. Please try again in 30 minutes."
-                    );
+                            "Invalid credentials. You have " + remaining + " attempt(s) remaining.");
                 }
+                throw new UnauthorizedException(
+                        "Account locked due to too many failed attempts. Try again in 30 minutes.");
             }
 
-            // Reset failed attempts on successful login
             accountLockService.resetFailedAttempts(user);
+            return buildTokenResponse(user);
 
-            log.debug("Password matches, generating tokens");
-            String accessToken = jwtService.generateToken(user);
-            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
-            
-            log.debug("Tokens generated successfully");
-            return TokenResponse.builder()
-                    .accessToken(accessToken)
-                    .refreshToken(refreshToken.getToken())
-                    .tokenType("Bearer")
-                    .expiresIn(jwtConfig.getExpiration() / 1000) // Convert to seconds
-                    .build();
         } catch (Exception e) {
             log.error("Login error for email: {}", email, e);
             throw e;
         }
     }
 
-    @Override
-    public User register(String name, String email, String password) {
-        if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Email already exists");
-        }
-
-        User user = new User();
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(password));
-
-        user.setIsActive(true);
-        userRepository.save(user);
-
-        Role donorRole = roleRepository.findByName("DONOR")
-                .orElseGet(() -> {
-                    Role role = new Role();
-                    role.setName("DONOR");
-                    return roleRepository.save(role);
-                });
-
-        UserRole userRole = new UserRole();
-        userRole.setUser(user);
-        userRole.setRole(donorRole);
-        userRoleRepository.save(userRole);
-
-        return user;
-    }
-
-    @Override
-    public TokenResponse refreshToken(String refreshTokenStr) {
-        log.debug("Refreshing token");
-        RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(refreshTokenStr);
-        User user = refreshToken.getUser();
-        
-        String newAccessToken = jwtService.generateToken(user);
-        
-        log.debug("Token refreshed successfully");
-        return TokenResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(refreshTokenStr)
-                .tokenType("Bearer")
-                .expiresIn(jwtConfig.getExpiration() / 1000)
-                .build();
-    }
+    // ── Login (password + OTP) ────────────────────────────────────────────────
 
     @Override
     public TokenResponse loginWithOtp(String email, String password, String otpCode) {
         try {
-            log.debug("Login with OTP attempt for email: {}", email);
-            
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
-            // Check if account is locked
-            if (accountLockService.isAccountLocked(user)) {
-                throw new UnauthorizedException(
-                    "Account is locked due to multiple failed login attempts. Please try again later or contact support."
-                );
-            }
+            checkNotBlocked(user);
+            checkNotLocked(user);
 
-            // Verify credentials first
             if (!passwordEncoder.matches(password, user.getPassword())) {
-                // Increment failed attempts
                 accountLockService.incrementFailedAttempts(user);
-                int remainingAttempts = accountLockService.getRemainingAttempts(user);
-                
-                if (remainingAttempts > 0) {
+                int remaining = accountLockService.getRemainingAttempts(user);
+                if (remaining > 0) {
                     throw new UnauthorizedException(
-                        "Invalid credentials. You have " + remainingAttempts + " attempt(s) remaining."
-                    );
-                } else {
-                    throw new UnauthorizedException(
-                        "Account has been locked due to too many failed login attempts. Please try again in 30 minutes."
-                    );
+                            "Invalid credentials. You have " + remaining + " attempt(s) remaining.");
                 }
-            }
-            
-            // Verify OTP
-            boolean otpValid = otpService.verifyOtp(email, otpCode, OtpType.LOGIN);
-            if (!otpValid) {
-                throw new BadRequestException("Invalid OTP code");
+                throw new UnauthorizedException(
+                        "Account locked due to too many failed attempts. Try again in 30 minutes.");
             }
 
-            // Reset failed attempts on successful login
+            if (!otpService.verifyOtp(email, otpCode, OtpType.LOGIN)) {
+                throw new BadRequestException("Invalid or expired OTP code.");
+            }
+
             accountLockService.resetFailedAttempts(user);
+            return buildTokenResponse(user);
 
-            log.debug("Password and OTP verified successfully, generating tokens");
-            String accessToken = jwtService.generateToken(user);
-            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
-            
-            log.debug("Tokens generated successfully");
-            return TokenResponse.builder()
-                    .accessToken(accessToken)
-                    .refreshToken(refreshToken.getToken())
-                    .tokenType("Bearer")
-                    .expiresIn(jwtConfig.getExpiration() / 1000)
-                    .build();
         } catch (Exception e) {
             log.error("Login with OTP error for email: {}", email, e);
             throw e;
         }
     }
 
+    // ── Register (password only) ──────────────────────────────────────────────
+
     @Override
-    public User registerWithOtp(String name, String email, String password, String otpCode) {
-        log.debug("Register with OTP attempt for email: {}", email);
-        
-        // Verify OTP first
-        boolean otpValid = otpService.verifyOtp(email, otpCode, OtpType.REGISTRATION);
-        if (!otpValid) {
-            throw new BadRequestException("Invalid OTP code");
-        }
-        
+    public User register(String name, String email, String password) {
         if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Email already exists");
+            throw new BadRequestException("An account with this email already exists.");
         }
 
         User user = new User();
@@ -224,59 +123,124 @@ public class AuthServiceImpl implements AuthService {
         user.setIsActive(true);
         userRepository.save(user);
 
-        Role donorRole = roleRepository.findByName("DONOR")
-                .orElseGet(() -> {
-                    Role role = new Role();
-                    role.setName("DONOR");
-                    return roleRepository.save(role);
-                });
-
-        UserRole userRole = new UserRole();
-        userRole.setUser(user);
-        userRole.setRole(donorRole);
-        userRoleRepository.save(userRole);
-        
-        // Send welcome email
-        emailService.sendWelcomeEmail(email, name);
-
-        log.debug("User registered successfully with email: {}", email);
+        assignRole(user, "DONOR");
         return user;
     }
 
+    // ── Register with OTP ─────────────────────────────────────────────────────
+
     @Override
-    public String sendLoginOtp(String email) {
-        log.debug("Sending login OTP to email: {}", email);
-        
-        // Check if user exists
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadRequestException("User with this email does not exist"));
-        
-        // Check if account is locked
-        if (accountLockService.isAccountLocked(user)) {
-            throw new UnauthorizedException(
-                "Account is locked due to multiple failed login attempts. Please try again later or contact support."
-            );
+    public User registerWithOtp(String name, String email, String password, String otpCode) {
+        if (!otpService.verifyOtp(email, otpCode, OtpType.REGISTRATION)) {
+            throw new BadRequestException("Invalid or expired OTP code.");
         }
-        
-        return otpService.generateAndSendOtp(email, OtpType.LOGIN);
+
+        if (userRepository.existsByEmail(email)) {
+            throw new BadRequestException("An account with this email already exists.");
+        }
+
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setIsActive(true);
+        userRepository.save(user);
+
+        assignRole(user, "DONOR");
+        emailService.sendWelcomeEmail(email, name);
+
+        log.info("User registered via OTP: {}", email);
+        return user;
+    }
+
+    // ── Token refresh (with rotation) ─────────────────────────────────────────
+
+    @Override
+    public TokenResponse refreshToken(String oldRefreshTokenStr) {
+        RefreshToken oldToken = refreshTokenService.verifyRefreshToken(oldRefreshTokenStr);
+        User user = oldToken.getUser();
+
+        // Revoke old token and issue a brand-new refresh token
+        refreshTokenService.revokeRefreshToken(oldRefreshTokenStr);
+        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user);
+
+        return TokenResponse.builder()
+                .accessToken(jwtService.generateToken(user))
+                .refreshToken(newRefreshToken.getToken())
+                .tokenType("Bearer")
+                .expiresIn(jwtConfig.getExpiration() / 1000)
+                .user(UserMapper.toResponse(user))
+                .build();
+    }
+
+    // ── Send OTPs ────────────────────────────────────────────────────────────
+
+    @Override
+    public void sendLoginOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("No account found with this email."));
+        checkNotBlocked(user);
+        checkNotLocked(user);
+        otpService.generateAndSendOtp(email, OtpType.LOGIN);
     }
 
     @Override
-    public String sendRegistrationOtp(String email) {
-        log.debug("Sending registration OTP to email: {}", email);
-        
-        // Check if user already exists
+    public void sendRegistrationOtp(String email) {
         if (userRepository.existsByEmail(email)) {
-            throw new BadRequestException("User with this email already exists");
+            throw new BadRequestException("An account with this email already exists.");
         }
-        
-        return otpService.generateAndSendOtp(email, OtpType.REGISTRATION);
+        otpService.generateAndSendOtp(email, OtpType.REGISTRATION);
     }
+
+    // ── Logout ───────────────────────────────────────────────────────────────
 
     @Override
     public void logout(String refreshTokenStr) {
-        log.debug("Logging out user with refresh token");
         refreshTokenService.revokeRefreshToken(refreshTokenStr);
-        log.debug("Refresh token revoked successfully");
+        log.info("User logged out, refresh token revoked.");
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void checkNotBlocked(User user) {
+        if (Boolean.TRUE.equals(user.getIsBlocked())) {
+            String reason = user.getBlockReason() != null ? user.getBlockReason() : "Policy violation";
+            throw new UnauthorizedException("Your account has been blocked. Reason: " + reason);
+        }
+    }
+
+    private void checkNotLocked(User user) {
+        if (accountLockService.isAccountLocked(user)) {
+            throw new UnauthorizedException(
+                    "Account locked due to multiple failed login attempts. Try again in 30 minutes.");
+        }
+    }
+
+    private TokenResponse buildTokenResponse(User user) {
+        user.setLastLoginAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
+        
+        String accessToken = jwtService.generateToken(user);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+        return TokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getToken())
+                .tokenType("Bearer")
+                .expiresIn(jwtConfig.getExpiration() / 1000)
+                .user(UserMapper.toResponse(user))
+                .build();
+    }
+
+    private void assignRole(User user, String roleName) {
+        Role role = roleRepository.findByName(roleName)
+                .orElseGet(() -> {
+                    Role r = new Role();
+                    r.setName(roleName);
+                    return roleRepository.save(r);
+                });
+        UserRole ur = new UserRole();
+        ur.setUser(user);
+        ur.setRole(role);
+        userRoleRepository.save(ur);
     }
 }

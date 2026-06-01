@@ -68,14 +68,16 @@ public class EventMapper {
                 event.getCharity() != null ? event.getCharity().getId() : null,
                 event.getCharity() != null ? event.getCharity().getName() : null,
                 charityLogo,
-                0, // TODO: Get actual donation count from repository
+                0,
                 participantCount,
                 progressPercentage,
                 images,
                 event.getLocation(),
                 event.getLatitude(),
                 event.getLongitude(),
-                event.getCategory()
+                event.getCategory(),
+                event.getKhqrImage(),
+                event.getBakongAccountId()
         );
     }
 }

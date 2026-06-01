@@ -7,8 +7,11 @@ import java.math.BigDecimal;
 
 @Getter @Setter
 public class EventUpdateRequest {
+    @jakarta.validation.constraints.Size(max=100)
     private String title;
     private String description;
     private BigDecimal goalAmount;
     private String status;
+    private String khqrImage;
+    private String bakongAccountId;
 }

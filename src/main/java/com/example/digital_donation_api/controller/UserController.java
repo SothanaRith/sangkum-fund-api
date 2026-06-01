@@ -36,7 +36,7 @@ public class UserController {
 
     @PutMapping("/profile")
     public ResponseEntity<UserResponse> updateProfile(
-            @RequestBody ProfileUpdateRequest request,
+            @jakarta.validation.Valid @RequestBody ProfileUpdateRequest request,
             Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();

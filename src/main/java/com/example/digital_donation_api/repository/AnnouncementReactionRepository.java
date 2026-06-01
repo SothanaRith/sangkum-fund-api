@@ -11,6 +11,8 @@ public interface AnnouncementReactionRepository
 
     long countByAnnouncementIdAndType(Long announcementId, ReactionType type);
 
+    java.util.List<AnnouncementReaction> findByAnnouncementId(Long announcementId);
+
     boolean existsByAnnouncementIdAndUserIdAndType(
             Long announcementId,
             Long userId,

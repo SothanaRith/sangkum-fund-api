@@ -14,4 +14,6 @@ public interface DonationService {
                    PaymentMethod paymentMethod, PaymentDetailsRequest paymentDetails);
                    
     Page<Donation> getMyDonations(Long userId, Pageable pageable);
+    
+    Donation verifyBakongDonation(Long eventId, Long userId, BigDecimal amount, String md5Hash, boolean anonymous);
 }

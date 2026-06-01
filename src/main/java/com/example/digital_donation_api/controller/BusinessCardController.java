@@ -37,7 +37,7 @@ public class BusinessCardController {
 
     @PostMapping
     public ResponseEntity<BusinessCardResponse> createOrUpdateCard(
-            @RequestBody BusinessCardCreateRequest request,
+            @jakarta.validation.Valid @RequestBody BusinessCardCreateRequest request,
             Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();
